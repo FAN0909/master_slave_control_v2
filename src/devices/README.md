@@ -4,11 +4,10 @@
 厂商 SDK 在连接时加载，设备层使用标准 `logging`，不依赖 PySide6 或 UI 日志类。
 
 ```text
-BaseDevice
-├── BaseCamera    → CameraD435
-├── BaseHand      → LinkHand
-├── BaseMasterArm → GelloArm
-└── BaseRobotArm  → NrcArm
+BaseCamera    → CameraD435
+BaseHand      → LinkHand
+BaseMasterArm → GelloArm
+BaseRobotArm  → NrcArm
 ```
 
 ## 新增设备
