@@ -3,12 +3,12 @@ import math
 import subprocess
 from pathlib import Path
 
+from src.ui.log_stream import Logger
 from src.devices.base.base_masterArm import BaseMasterArm
+from vendor.gello.dynamixel import DynamixelDriver
 from typing import Optional, Sequence
 
 class GelloArm(BaseMasterArm):
-    """被动主手，仅提供关节读数；将厂商 SDK 弧度转换为度。"""
-
     CONFIG_PATH = Path(__file__).resolve().parents[3] / "config" / "master_arm.json"
 
     def __init__(
@@ -22,18 +22,19 @@ class GelloArm(BaseMasterArm):
         use_fake_fallback: bool = False,
         config_path=None,
     ):
-        super().__init__(name)
-        self.config_path = Path(config_path) if config_path is not None else self.CONFIG_PATH
-        self._load_config(ids)
-        self.servo_types = servo_types
-        self.port = port
-        self.baudrate = baudrate
-        self.max_retries = max_retries
-        self.use_fake_fallback = use_fake_fallback
+            super().__init__(name)
+            self.config_path = Path(config_path) if config_path is not None else self.CONFIG_PATH
+            self._load_config(ids)
+            self.servo_types = servo_types
+            self.port = port
+            self.baudrate = baudrate
+            self.max_retries = max_retries
+            self.use_fake_fallback = use_fake_fallback
 
-        self.dynamixel_driver = None
-        self.is_connected = False
-        self.is_enabled = False
+            self.dynamixel_driver = None
+            self.is_connected = False
+            self.is_enabled = False
+            self.last_error = ""
 
     def _load_config(self, ids=None):
         """读取主手维度和默认舵机 ID，允许显式传入 ID。"""
@@ -58,33 +59,33 @@ class GelloArm(BaseMasterArm):
             self.ids = joint_ids
         except (OSError, ValueError, KeyError, TypeError) as error:
             message = f"Gello 配置读取失败 ({self.config_path}): {error}"
-            self._fail(message)
+            Logger.instance().error(message)
             raise ValueError(message) from error
 
     def Connect(self) -> bool:
-        if self.is_connected:
-            return True
-        if self.dynamixel_driver is not None and not self.Disconnect():
-            return False
         self.last_error = ""
         try:
             # The bundled driver kills processes that own its serial port.
             # Refuse the connection here before entering that SDK code.
             if not Path(self.port).exists():
-                return self._fail(f"serial port does not exist: {self.port}")
+                self.last_error = f"[{self.name}] serial port does not exist: {self.port}"
+                Logger.instance().error(self.last_error)
+                return False
             owner = subprocess.run(
                 ["lsof", "-t", self.port], capture_output=True, text=True, check=False
             )
             if owner.stdout.strip():
-                return self._fail(
-                    f"serial port {self.port} is in use by PID(s): "
+                self.last_error = (
+                    f"[{self.name}] serial port {self.port} is in use by PID(s): "
                     f"{', '.join(owner.stdout.split())}"
                 )
+                Logger.instance().error(self.last_error)
+                return False
             if owner.returncode not in (0, 1):
-                return self._fail(f"cannot check serial port {self.port}: {owner.stderr.strip()}")
+                self.last_error = f"[{self.name}] cannot check serial port {self.port}: {owner.stderr.strip()}"
+                Logger.instance().error(self.last_error)
+                return False
             # 这里的调用方式和底层库签名一致，参数名与 __init__ 一一对应
-            from vendor.gello.dynamixel import DynamixelDriver
-
             self.dynamixel_driver = DynamixelDriver(
                 ids=self.ids,
                 servo_types=self.servo_types,
@@ -95,31 +96,58 @@ class GelloArm(BaseMasterArm):
             )
             self.is_connected = True
             return True
-        except Exception as error:
+        except Exception as e:
+            self.last_error = f"[{self.name}] connect failed: {e}"
+            Logger.instance().error(self.last_error)
+            self.dynamixel_driver = None
             self.is_connected = False
-            return self._fail(f"connect failed: {error}")
+            return False
 
     def Disconnect(self) -> bool:
         try:
-            if self.dynamixel_driver is not None:
+            if getattr(self, "dynamixel_driver", None) is not None:
                 self.dynamixel_driver.close()
+
             self.dynamixel_driver = None
             self.is_connected = False
-            self.is_enabled = False
-            self.last_error = ""
+            Logger.instance().info(f"[{self.name}] disconnected")
             return True
-        except Exception as error:
+        except Exception as e:
+            Logger.instance().error(f"[{self.name}] disconnect failed: {e}")
+            self.dynamixel_driver = None
             self.is_connected = False
-            self.is_enabled = False
-            return self._fail(f"disconnect failed: {error}")
+            return False
 
     def Get_joint_positions(self) -> list:
-        """将 SDK 弧度转换为度；读取失败或维度错误返回 []。"""
-        if not self._ready():
-            return []
         try:
-            values = self._values(self.dynamixel_driver.get_joints(), self.MAX_JOINT_COUNT)
-            return self._values([math.degrees(value) for value in values], self.MAX_JOINT_COUNT)
-        except Exception as error:
-            self._fail(f"get joint positions failed: {error}")
-            return []
+            pos = self.dynamixel_driver.get_joints()
+            if pos is None:
+                return [0.0] * self.MAX_JOINT_COUNT
+
+            values = [float(value) for value in pos]
+            if len(values) < self.MAX_JOINT_COUNT:
+                values.extend([0.0] * (self.MAX_JOINT_COUNT - len(values)))
+            elif len(values) > self.MAX_JOINT_COUNT:
+                values = values[: self.MAX_JOINT_COUNT]
+            return [math.degrees(value) for value in values]
+
+        except Exception as e:
+            Logger.instance().error(f"[{self.name}] get_current_position error: {e}")
+            return [0.0] * self.MAX_JOINT_COUNT
+
+
+    def Enable(self) -> bool:
+        raise NotImplementedError(
+            f"[{self.name}] Gello does not support Enable"
+        )
+
+    def Disable(self) -> bool:
+        raise NotImplementedError(
+            f"[{self.name}] Gello does not support Disable"
+        )
+
+    def Get_tcp_positions(self) -> list:
+        raise NotImplementedError(
+            f"[{self.name}] Gello does not provide TCP positions"
+        )
+

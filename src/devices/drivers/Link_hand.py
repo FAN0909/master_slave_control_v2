@@ -1,30 +1,19 @@
+import math
+
 from src.devices.base.base_hand import BaseHand
-
-
+from vendor.linkerhand_python_sdk.LinkerHand.linker_hand_api import LinkerHandApi
+from src.ui.log_stream import Logger
 class LinkHand(BaseHand):
-    """LinkerHand：位置、速度、力矩限制均为 SDK 的 0～255 原生值。
-
-    positions/force 长度为 MAX_JOINTS；speed 按 SDK 的速度通道传入列表。
-    O6/L6 为 6 通道，L7 为 7 通道，其余型号至少 5 通道。
-    命令返回 True 表示通过校验且已提交 SDK，不表示设备已经运动到位。
-    """
-
-    JOINT_COUNTS = {"O6": 6, "L6": 6, "L7": 7, "L10": 10,
-                    "L20": 20, "G20": 20, "L21": 25, "L25": 25}
-
     def __init__(self, name: str, hand_type="left", hand_joint="O6", modbus="None",
                  can="can0", comm_type=None, comm_info=None):
         super().__init__(name)
-        self.hand_type = {"Right Hand": "right", "Left Hand": "left"}.get(hand_type, hand_type)
-        if self.hand_type not in ("left", "right"):
-            raise ValueError(f"不支持的手侧：{hand_type}")
-        self.hand_joint = hand_joint.upper()
-        if self.hand_joint not in self.JOINT_COUNTS:
-            raise ValueError(f"不支持的灵巧手型号：{hand_joint}")
+        self.hand_type = {
+            "Right Hand": "right",
+            "Left Hand": "left",
+        }.get(hand_type, hand_type)
+        self.hand_joint = hand_joint
         if comm_type is not None:
             communication = comm_type.strip().lower()
-            if not comm_info:
-                raise ValueError("通信端口不能为空")
             if communication in ("modbus", "modebus"):
                 modbus, can = comm_info, "None"
             elif communication == "can":
@@ -33,81 +22,121 @@ class LinkHand(BaseHand):
                 raise ValueError(f"不支持的灵巧手通信方式：{comm_type}")
         self.modbus = modbus
         self.can = can
-        self.hand_api = None
+        self.is_connected = False
+        self.is_enabled = False
+        self.hand_api = None  # Placeholder for the actual hand API instance
 
     def MAX_JOINTS(self) -> int:
-        return self.JOINT_COUNTS[self.hand_joint]
+        if (self.hand_joint.upper() == "O6" or self.hand_joint.upper() == "L6"):
+            return 6
+        elif self.hand_joint.upper() == "L7":
+            return 7
+        elif self.hand_joint.upper() == "L10":
+            return 10
+        elif self.hand_joint.upper() == "L20":
+            return 20
+        elif self.hand_joint.upper() == "G20":
+            return 20
+        elif self.hand_joint.upper() == "L21":
+            return 25
+        elif self.hand_joint.upper() == "L25":
+            return 25
+        return 0
 
     def Connect(self) -> bool:
-        if self.is_connected:
-            return True
-        if self.hand_api is not None and not self.Disconnect():
-            return False
-        self.last_error = ""
+        # Implement the connection logic for LinkHandO6
+        # For example, establish a serial connection or network connection
         try:
-            from vendor.linkerhand_python_sdk.LinkerHand.linker_hand_api import LinkerHandApi
+            if self.hand_api is None:
+                self.hand_api = LinkerHandApi(hand_type=self.hand_type, hand_joint=self.hand_joint, modbus=self.modbus, can=self.can)
 
-            self.hand_api = LinkerHandApi(hand_type=self.hand_type, hand_joint=self.hand_joint,
-                                          modbus=self.modbus, can=self.can)
             self.is_connected = True
             return True
-        except (Exception, SystemExit) as error:
-            # 厂商 SDK 连接失败可能调用 sys.exit；不得导致整个 GUI 退出。
+        except Exception as e:
+            Logger.instance().error(f"[{self.name}] connect failed: {e}")
             self.is_connected = False
-            return self._fail(f"connect failed: {error}")
+            return False
 
     def Disconnect(self) -> bool:
         try:
             if self.hand_api is not None:
                 backend = self.hand_api.hand
-                # SDK close_can() 引用了未定义变量，直接关闭实际传输。
+                # SDK close_can() references an undefined `modbus` variable.
+                # Close the actual transport, including its CAN receive thread.
                 if hasattr(backend, "close_can_interface"):
                     backend.close_can_interface()
                 else:
                     backend.close()
                 self.hand_api = None
             self.is_connected = False
-            self.is_enabled = False
-            self.last_error = ""
+            Logger.instance().info(f"[{self.name}] disconnected")
             return True
-        except Exception as error:
-            self.is_connected = False
-            self.is_enabled = False
-            return self._fail(f"disconnect failed: {error}")
-
-    def _send(self, method: str, values, count: int) -> bool:
-        if not self._ready():
+        except Exception as e:
+            Logger.instance().error(f"[{self.name}] disconnect failed: {e}")
             return False
-        try:
-            values = self._values(values, count, minimum=0, maximum=255)
-            result = getattr(self.hand_api, method)([int(value) for value in values])
-            if result is False:
-                return self._fail(f"{method} 被 SDK 拒绝")
-            return True
-        except Exception as error:
-            return self._fail(f"{method} failed: {error}")
 
     def Set_joint_positions(self, positions: list) -> bool:
-        return self._send("finger_move", positions, self.MAX_JOINTS())
+        # Implement the logic to set joint positions for LinkHandO6
+        try:
+            if self.hand_api is None:
+                Logger.instance().error(f"[{self.name}] hand API not connected")
+                return False
+
+            max_joints = self.MAX_JOINTS()
+            if max_joints <= 0:
+                Logger.instance().error(f"[{self.name}] unsupported joint type: {self.hand_joint}")
+                return False
+
+            pos = [int(p) for p in positions]
+            if len(pos) != max_joints:
+                Logger.instance().error(
+                    f"[{self.name}] joint count mismatch: expected {max_joints}, got {len(pos)}"
+                )
+                return False
+
+            self.hand_api.finger_move(pos)
+            return True
+        except Exception as e:
+            Logger.instance().error(f"[{self.name}] set joint positions failed: {e}")
+            return False
 
     def Get_joint_positions(self) -> list:
-        if not self._ready():
-            return []
-        try:
-            return self._values(self.hand_api.get_state(), self.MAX_JOINTS(), minimum=0, maximum=255)
-        except Exception as error:
-            self._fail(f"get joint positions failed: {error}")
+        """读取灵巧手当前关节位置；读取失败时返回空列表。"""
+        if not self.is_connected or self.hand_api is None:
+            Logger.instance().error(f"[{self.name}] hand API not connected")
             return []
 
-    def Set_speed(self, speed: list[float]) -> bool:
         try:
-            values = list(speed)
-            count = 6 if self.hand_joint in ("O6", "L6") else 7 if self.hand_joint == "L7" else len(values)
-            if len(values) < 5:
-                return self._fail("速度至少需要 5 个通道")
-            return self._send("set_speed", values, count)
-        except (TypeError, ValueError) as error:
-            return self._fail(f"invalid speed: {error}")
+            positions = self.hand_api.get_state()
+            if positions is None:
+                raise ValueError("SDK returned no joint positions")
+            joint_positions = [float(value) for value in positions]
+            if len(joint_positions) != self.MAX_JOINTS() or not all(
+                math.isfinite(value) for value in joint_positions
+            ):
+                raise ValueError(f"invalid joint positions: {joint_positions}")
+            return joint_positions
+        except Exception as error:
+            Logger.instance().error(f"[{self.name}] get joint positions failed: {error}")
+            return []
+
+    def Set_speed(self, speed=[100]*5) -> bool:
+        # Implement the logic to set speed for LinkHandO6
+        try:
+            # Set speed logic here
+            speed_values = speed
+            self.hand_api.set_speed(speed_values)
+            return True
+        except Exception as e:
+            Logger.instance().error(f"[{self.name}] set speed failed: {e}")
+            return False
 
     def Set_force(self, force: list) -> bool:
-        return self._send("set_torque", force, self.MAX_JOINTS())
+        try:
+            if self.hand_api is None or len(force) != self.MAX_JOINTS():
+                return False
+            self.hand_api.set_torque(force)
+            return True
+        except Exception as error:
+            Logger.instance().error(f"[{self.name}] set force failed: {error}")
+            return False

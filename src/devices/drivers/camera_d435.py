@@ -1,69 +1,52 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
+import numpy as np
 
 from src.devices.base.base_camera import BaseCamera
-
-if TYPE_CHECKING:
-    import numpy as np
+from src.ui.log_stream import Logger
+from vendor.realsense.realsense_manager import RealSenseManager
 
 
 class CameraD435(BaseCamera):
-    """Intel RealSense D435：返回独立的 BGR8 彩色帧。"""
+    """Intel RealSense D435 彩色相机驱动。"""
 
     def __init__(self, name: str, serial_number: str | None = None):
         super().__init__(name)
         self.serial_number = serial_number
-        self.camera_manager = None
-
-    def _manager(self):
-        if self.camera_manager is None:
-            from vendor.realsense.realsense_manager import RealSenseManager
-
-            self.camera_manager = RealSenseManager()
-        return self.camera_manager
+        self.camera_manager = RealSenseManager()
 
     def list_devices(self) -> list[tuple[str, str]]:
-        """返回 (名称, 序列号)；枚举失败返回 [] 并设置 last_error。"""
-        self.last_error = ""
-        try:
-            return self._manager().list_devices()
-        except Exception as error:
-            self._fail(f"list devices failed: {error}")
-            return []
+        """Return available RealSense devices as (name, serial number) pairs."""
+        return self.camera_manager.list_devices()
 
     def Connect(self) -> bool:
         if self.is_connected:
             return True
-        self.last_error = ""
         try:
-            manager = self._manager()
-            manager.connect(self.serial_number)
-            if not manager.is_connected():
-                raise RuntimeError("camera is not connected")
-            self.is_connected = True
-            return True
+            self.camera_manager.connect(self.serial_number)
+            self.is_connected = self.camera_manager.is_connected()
+            if not self.is_connected:
+                Logger.instance().error(f"[{self.name}] connect failed: camera is not connected")
+            return self.is_connected
         except Exception as error:
+            Logger.instance().error(f"[{self.name}] connect failed: {error}")
             self.is_connected = False
-            return self._fail(f"connect failed: {error}")
+            return False
 
     def Disconnect(self) -> bool:
         try:
-            if self.camera_manager is not None:
-                self.camera_manager.disconnect()
+            self.camera_manager.disconnect()
             self.is_connected = False
-            self.is_enabled = False
-            self.last_error = ""
+            Logger.instance().info(f"[{self.name}] disconnected")
             return True
         except Exception as error:
+            Logger.instance().error(f"[{self.name}] disconnect failed: {error}")
             self.is_connected = self.camera_manager.is_connected()
-            return self._fail(f"disconnect failed: {error}")
+            return False
 
     def Get_color_frame(self) -> np.ndarray | None:
-        if not self._ready():
+        if not self.is_connected:
             return None
         try:
             return self.camera_manager.get_color_frame()
         except Exception as error:
-            self._fail(f"get color frame failed: {error}")
+            Logger.instance().error(f"[{self.name}] get color frame failed: {error}")
             return None

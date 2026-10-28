@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-import logging
 import numpy as np
 class BaseCamera(ABC):
     """Abstract base class for Camera devices.
@@ -12,19 +11,6 @@ class BaseCamera(ABC):
         self.name = name
         self.is_connected = False
         self.is_enabled = False
-        self.last_error = ""
-        self.logger = logging.getLogger(f"{type(self).__module__}.{name}")
-
-    def _fail(self, message: str) -> bool:
-        self.last_error = str(message)
-        self.logger.error("[%s] %s", self.name, self.last_error)
-        return False
-
-    def _ready(self) -> bool:
-        if not self.is_connected:
-            return self._fail("设备未连接")
-        self.last_error = ""
-        return True
 
     @abstractmethod
     def Connect(self) -> bool:
