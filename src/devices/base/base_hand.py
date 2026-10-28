@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class BaseHand(ABC):
     """Abstract base class for Hand devices.
 
@@ -10,40 +11,33 @@ class BaseHand(ABC):
     def __init__(self, name: str):
         self.name = name
         self.is_connected = False
-        self.is_enabled = False
 
     @abstractmethod
     def Connect(self) -> bool:
         """Connect to the robot arm and return the socket connection."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Disconnect(self) -> bool:
         """Disconnect from the robot arm."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Set_joint_positions(self, positions: list) -> bool:
         """Set the joint positions."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
-    def Set_speed(self, speed: float) -> bool:
+    def Set_speed(self, speed: list[float]) -> bool:
         """Set the speed of the hand."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Get_joint_positions(self) -> list:
         """get joints pos."""
-        pass
-
-    @abstractmethod
-    def MAX_JOINTS(self) -> int:
-        """Return the number of controllable hand joints."""
         raise NotImplementedError
 
     @abstractmethod
     def Set_force(self, force: list) -> bool:
         """Set per-joint force values for configured hand actions."""
         raise NotImplementedError
-

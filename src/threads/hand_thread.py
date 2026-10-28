@@ -37,7 +37,7 @@ class HandThread(QObject):
             if device.Connect():
                 self.sig_connect_result.emit(True, f"[{device.name}] 已连接")
                 return True
-            message = device.last_error or f"[{device.name}] 连接失败"
+            message = getattr(device, "last_error", "") or f"[{device.name}] 连接失败"
         except Exception as error:
             message = f"连接失败：{error}"
         if self.device is not None:
@@ -45,7 +45,7 @@ class HandThread(QObject):
                 if self.device.Disconnect():
                     self.device = None
                 else:
-                    message += f"；清理失败：{self.device.last_error}"
+                    message += f"；清理失败：{getattr(self.device, 'last_error', '')}"
             except Exception as error:
                 message += f"；清理失败：{error}"
         self._error(message)
@@ -60,7 +60,7 @@ class HandThread(QObject):
             return False
         try:
             success = self.device.Disconnect()
-            message = self.device.last_error or f"[{self.device.name}] 断开失败"
+            message = getattr(self.device, "last_error", "") or f"[{self.device.name}] 断开失败"
         except Exception as error:
             success = False
             message = f"断开失败：{error}"
@@ -102,7 +102,7 @@ class HandThread(QObject):
             return False
         try:
             success = bool(getattr(self.device, name)(*args))
-            message = "指令已发送" if success else (self.device.last_error or "指令失败")
+            message = "指令已发送" if success else (getattr(self.device, "last_error", "") or "指令失败")
         except Exception as error:
             success = False
             message = f"{name} 失败：{error}"
@@ -125,7 +125,7 @@ class HandThread(QObject):
             if len(joints) != self.device.MAX_JOINTS() or not all(
                 math.isfinite(value) for value in joints
             ):
-                raise ValueError(self.device.last_error or "灵巧手关节数据无效")
+                raise ValueError(getattr(self.device, "last_error", "") or "灵巧手关节数据无效")
         except Exception as error:
             self.StopPolling()
             self._error(f"灵巧手读取失败：{error}")

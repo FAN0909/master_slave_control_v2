@@ -1,9 +1,20 @@
 import math
 
 from src.devices.base.base_hand import BaseHand
+from src.log import Logger
 from vendor.linkerhand_python_sdk.LinkerHand.linker_hand_api import LinkerHandApi
-from src.ui.log_stream import Logger
+
+
 class LinkHand(BaseHand):
+    SPEED_LENGTHS = {
+        "O6": (6,), "L6": (6,), "L7": (7,), "L10": (5, 10),
+        "L20": (5,), "G20": (5,), "L21": (5, 25), "L25": (5, 25),
+    }
+    FORCE_LENGTHS = {
+        "O6": (6,), "L6": (6,), "L7": (7,), "L10": (5, 10),
+        "G20": (5,), "L21": (5,), "L25": (5,),
+    }
+
     def __init__(self, name: str, hand_type="left", hand_joint="O6", modbus="None",
                  can="can0", comm_type=None, comm_info=None):
         super().__init__(name)
@@ -120,23 +131,55 @@ class LinkHand(BaseHand):
             Logger.instance().error(f"[{self.name}] get joint positions failed: {error}")
             return []
 
-    def Set_speed(self, speed=[100]*5) -> bool:
-        # Implement the logic to set speed for LinkHandO6
+    @staticmethod
+    def _valid_channel_values(values: list, lengths: tuple[int, ...]) -> bool:
+        return (
+            isinstance(values, list)
+            and len(values) in lengths
+            and all(
+                type(value) in (int, float)
+                and math.isfinite(value)
+                and 0 <= value <= 255
+                and value == int(value)
+                for value in values
+            )
+        )
+
+    def Set_speed(self, speed: list) -> bool:
+        if not self.is_connected or self.hand_api is None:
+            Logger.instance().error(f"[{self.name}] hand API not connected")
+            return False
+        joint_type = self.hand_joint.upper()
+        lengths = self.SPEED_LENGTHS.get(joint_type, ())
+        if joint_type == "L10" and self.modbus != "None":
+            lengths = (10,)
+        if not self._valid_channel_values(speed, lengths):
+            Logger.instance().error(f"[{self.name}] invalid speed values for {joint_type}: {speed}")
+            return False
+
         try:
-            # Set speed logic here
-            speed_values = speed
-            self.hand_api.set_speed(speed_values)
-            return True
+            return self.hand_api.set_speed([int(value) for value in speed]) is not False
         except Exception as e:
             Logger.instance().error(f"[{self.name}] set speed failed: {e}")
             return False
 
     def Set_force(self, force: list) -> bool:
+        if not self.is_connected or self.hand_api is None:
+            Logger.instance().error(f"[{self.name}] hand API not connected")
+            return False
+        joint_type = self.hand_joint.upper()
+        lengths = self.FORCE_LENGTHS.get(joint_type, ())
+        if not lengths:
+            Logger.instance().error(f"[{self.name}] force control is not supported for {joint_type}")
+            return False
+        if joint_type == "L10" and self.modbus != "None":
+            lengths = (10,)
+        if not self._valid_channel_values(force, lengths):
+            Logger.instance().error(f"[{self.name}] invalid force values for {joint_type}: {force}")
+            return False
+
         try:
-            if self.hand_api is None or len(force) != self.MAX_JOINTS():
-                return False
-            self.hand_api.set_torque(force)
-            return True
+            return self.hand_api.set_torque([int(value) for value in force]) is not False
         except Exception as error:
             Logger.instance().error(f"[{self.name}] set force failed: {error}")
             return False

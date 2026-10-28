@@ -1,0 +1,9 @@
+# GUI and core runtime
+numpy
+PySide6
+
+# Hardware drivers used by the bundled camera and LinkerHand integrations
+pyrealsense2
+python-can
+pymodbus
+PyYAML

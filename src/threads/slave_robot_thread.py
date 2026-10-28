@@ -38,7 +38,7 @@ class SlaveRobotThread(QObject):
             if device.Connect():
                 self.sig_connect_result.emit(True, f"[{device.name}] 已连接")
                 return True
-            message = device.last_error or f"[{device.name}] 连接失败"
+            message = getattr(device, "last_error", "") or f"[{device.name}] 连接失败"
         except Exception as error:
             message = f"连接失败：{error}"
         if self.device is not None:
@@ -46,7 +46,7 @@ class SlaveRobotThread(QObject):
                 if self.device.Disconnect():
                     self.device = None
                 else:
-                    message += f"；清理失败：{self.device.last_error}"
+                    message += f"；清理失败：{getattr(self.device, 'last_error', '')}"
             except Exception as error:
                 message += f"；清理失败：{error}"
         self._error(message)
@@ -61,7 +61,7 @@ class SlaveRobotThread(QObject):
             return False
         try:
             success = self.device.Disconnect()
-            message = self.device.last_error or f"[{self.device.name}] 断开失败"
+            message = getattr(self.device, "last_error", "") or f"[{self.device.name}] 断开失败"
         except Exception as error:
             success = False
             message = f"断开失败：{error}"
@@ -103,7 +103,7 @@ class SlaveRobotThread(QObject):
             return False
         try:
             success = bool(getattr(self.device, name)(*args))
-            message = "指令已发送" if success else (self.device.last_error or "指令失败")
+            message = "指令已发送" if success else (getattr(self.device, "last_error", "") or "指令失败")
         except Exception as error:
             success = False
             message = f"{name} 失败：{error}"
@@ -123,7 +123,7 @@ class SlaveRobotThread(QObject):
         try:
             values = getattr(self.device, method)()
             if len(values) != count or not all(math.isfinite(value) for value in values):
-                raise ValueError(self.device.last_error or f"{method} 数据无效")
+                raise ValueError(getattr(self.device, "last_error", "") or f"{method} 数据无效")
         except Exception as error:
             self.StopPolling()
             self._error(f"从手读取失败：{error}")
@@ -153,11 +153,11 @@ class SlaveRobotThread(QObject):
             if len(joints) != self.device.MAX_JOINT_COUNT or not all(
                 math.isfinite(value) for value in joints
             ):
-                raise ValueError(self.device.last_error or "从手关节数据无效")
+                raise ValueError(getattr(self.device, "last_error", "") or "从手关节数据无效")
             if len(tcp) != self.device.TCP_DIM or not all(
                 math.isfinite(value) for value in tcp
             ):
-                raise ValueError(self.device.last_error or "从手 TCP 数据无效")
+                raise ValueError(getattr(self.device, "last_error", "") or "从手 TCP 数据无效")
         except Exception as error:
             self.StopPolling()
             self._error(f"从手读取失败：{error}")

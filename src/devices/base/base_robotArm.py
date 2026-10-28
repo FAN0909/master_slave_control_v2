@@ -17,32 +17,32 @@ class BaseRobotArm(ABC):
     @abstractmethod
     def Connect(self) -> bool:
         """Connect to the robot arm and return the socket connection."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Disconnect(self) -> bool:
         """Disconnect from the robot arm."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Enable(self) -> bool:
         """Enable the robot arm."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Disable(self) -> bool:
         """Disable the robot arm."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Get_joint_positions(self) -> list:
         """Read the current joint positions."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Get_tcp_positions(self) -> list:
         """Read the current TCP positions."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Move_j(
@@ -53,7 +53,7 @@ class BaseRobotArm(ABC):
         deceleration: float
     ) -> bool:
         """Move the robot arm in joint space."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Move_l(
@@ -64,19 +64,19 @@ class BaseRobotArm(ABC):
         deceleration: float
     ) -> bool:
         """Move the robot arm in Cartesian space."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Open_servoJ(self) -> bool:
         """Open the servo control."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Close_servoJ(self) -> bool:
         """Close the servo control."""
-        pass
+        raise NotImplementedError
     
     @abstractmethod
     def Set_servoJ_pos(self,target_positions: list,) -> bool:
         """Set the servo control to a specific position."""
-        pass
+        raise NotImplementedError

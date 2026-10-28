@@ -1,6 +1,7 @@
 #!/usr/bin/env python3 
 # -*- coding: utf-8 -*-
 import sys, os, time,threading
+import math
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from utils.mapping import *
 from utils.color_msg import ColorMsg
@@ -16,6 +17,7 @@ class LinkerHandApi:
         self.can = can
         ColorMsg(msg=f"Current SDK version: {self.version}", color="green")
         self.hand_joint = hand_joint
+        self.modbus = modbus
         self.hand_type = hand_type
         self.is_palm_touch = -1 # 是否为全掌压力传感器
         if self.hand_type == "left":
@@ -130,47 +132,80 @@ class LinkerHandApi:
         self.hand.get_approach_inc()
     
 
-    def set_speed(self, speed=[100]*5):
-        '''# Set speed'''
-        has_non_int = any(not isinstance(x, (int, float)) or x < 0 or x > 255 for x in speed)
-        if has_non_int:
-            print("Set Speed The numerical range can only be positive integers or floating-point numbers between 0 and 255", flush=True)
-            return
-        if len(speed) < 5:
-            print("数据长度不够,至少5个元素", flush=True)
-            return
-        if self.hand_joint == "L7" and len(speed) < 7:
-            print("数据长度不够,至少7个元素", flush=True)
-            return
+    def set_speed(self, speed: list):
+        '''Set speed using the channel count supported by this hand model.'''
+        if not isinstance(speed, list):
+            return False
+        model = self.hand_joint.upper()
+        if model in ("O6", "L6"):
+            lengths = (6,)
+        elif model == "L7":
+            lengths = (7,)
+        elif model == "L10":
+            lengths = (10,) if self.modbus != "None" else (5, 10)
+        elif model in ("L20", "G20"):
+            lengths = (5,)
+        elif model in ("L21", "L25"):
+            lengths = (5, 25)
+        else:
+            return False
+        if len(speed) not in lengths or any(
+            type(value) not in (int, float) or not math.isfinite(value)
+            or not 0 <= value <= 255 or value != int(value)
+            for value in speed
+        ):
+            return False
         ColorMsg(msg=f"{self.hand_type} {self.hand_joint} set speed to {speed}", color="green")
-        self.hand.set_speed(speed=speed)
+        return self.hand.set_speed(speed=[int(value) for value in speed]) is not False
     
-    def set_joint_speed(self, speed=[100]*5):
+    def set_joint_speed(self, speed: list):
         '''Set speed by topic'''
-        if len(speed) == 0:
-            return
-        if any(not isinstance(x, (int, float)) or x < 10 or x > 255 for x in speed):
-            ColorMsg(msg=f"The numerical range cannot be less than 10 or greater than 255",color="red")
-            return
-        self.hand.set_speed(speed=speed)
+        if not isinstance(speed, list):
+            return False
+        model = self.hand_joint.upper()
+        if model in ("O6", "L6"):
+            lengths = (6,)
+        elif model == "L7":
+            lengths = (7,)
+        elif model == "L10":
+            lengths = (10,) if self.modbus != "None" else (5, 10)
+        elif model in ("L20", "G20"):
+            lengths = (5,)
+        elif model in ("L21", "L25"):
+            lengths = (5, 25)
+        else:
+            return False
+        if len(speed) not in lengths or any(
+            type(value) not in (int, float) or not math.isfinite(value)
+            or not 10 <= value <= 255 or value != int(value)
+            for value in speed
+        ):
+            return False
+        return self.hand.set_speed(speed=[int(value) for value in speed]) is not False
     
-    def set_torque(self, torque=[180] * 5):
+    def set_torque(self, torque: list):
         '''Set maximum torque'''
-        has_non_int = any(not isinstance(x, (int, float)) or x < 0 or x > 255 for x in torque)
-        if has_non_int:
-            print("Set Torque The numerical range can only be positive integers or floating-point numbers between 0 and 255", flush=True)
-            return
-        if len(torque) < 5:
-            print("数据长度不够,至少5个元素", flush=True)
-            return
-        if self.hand_joint == "L7" and len(torque) < 7:
-            print("数据长度不够,至少7个元素", flush=True)
-            return
-        if (self.hand_joint == "L6" or self.hand_joint == "O6") and len(torque) != 6:
-            print("L6 or O6数据长度错误,至少6个元素", flush=True)
-            return
+        if not isinstance(torque, list):
+            return False
+        model = self.hand_joint.upper()
+        if model in ("O6", "L6"):
+            lengths = (6,)
+        elif model == "L7":
+            lengths = (7,)
+        elif model == "L10":
+            lengths = (10,) if self.modbus != "None" else (5, 10)
+        elif model in ("G20", "L21", "L25"):
+            lengths = (5,)
+        else:
+            return False
+        if len(torque) not in lengths or any(
+            type(value) not in (int, float) or not math.isfinite(value)
+            or not 0 <= value <= 255 or value != int(value)
+            for value in torque
+        ):
+            return False
         ColorMsg(msg=f"{self.hand_type} {self.hand_joint} set maximum torque to {torque}", color="green")
-        return self.hand.set_torque(torque=torque)
+        return self.hand.set_torque(torque=[int(value) for value in torque]) is not False
     
     
     def set_current(self, current=[250] * 5):

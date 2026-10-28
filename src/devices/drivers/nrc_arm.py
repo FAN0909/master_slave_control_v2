@@ -2,7 +2,7 @@ import json
 import math
 from pathlib import Path
 
-from src.ui.log_stream import Logger
+from src.log import Logger
 from src.devices.base.base_robotArm import BaseRobotArm
 
 # NRC 的原生扩展依赖系统库；连接 NRC 时再加载，避免它阻断整个界面启动。
@@ -57,7 +57,7 @@ class NrcArm(BaseRobotArm):
             Logger.instance().error(message)
             raise ValueError(message) from error
 
-    #region command 6001 port control
+    #connect command_port and servo_port
     def Connect(self) -> bool:
         global nrc_interface
         try:
@@ -69,14 +69,15 @@ class NrcArm(BaseRobotArm):
             Logger.instance().info(f"[{self.name}] connecting to {self.ip_address}:{self.command_port} and {self.servo_port}...")
             self.command_fd = nrc_interface.connect_robot(self.ip_address, str(self.command_port))
             if self.command_fd == -1:
+                self.command_fd = None
                 self.last_error = f"NRC 连接失败：命令端口 {self.command_port} 无法连接"
                 Logger.instance().error(f"[{self.name}] {self.last_error}")
                 self.is_connected = False
                 return False
             self.servo_fd = nrc_interface.connect_robot(self.ip_address, str(self.servo_port))
             if self.servo_fd == -1:
-                nrc_interface.disconnect_robot(self.command_fd)
-                self.command_fd = None
+                self.servo_fd = None
+                self.Disconnect()
                 self.last_error = f"NRC 连接失败：伺服端口 {self.servo_port} 无法连接"
                 Logger.instance().error(f"[{self.name}] {self.last_error}")
                 self.is_connected = False
@@ -87,6 +88,7 @@ class NrcArm(BaseRobotArm):
             self.is_connected = True
             return True
         except Exception as e:
+            self.Disconnect()
             self.last_error = f"NRC 连接失败：{e}"
             if isinstance(e, (ImportError, OSError)):
                 self.last_error += "；请检查 Python 3.12、系统架构及 ldd vendor/nrc/_nrc_host.so"
@@ -95,11 +97,23 @@ class NrcArm(BaseRobotArm):
             return False
 
     def Disconnect(self) -> bool:
-        nrc_interface.disconnect_robot(self.command_fd)
-        nrc_interface.disconnect_robot(self.servo_fd)
-        Logger.instance().info(f"[{self.name}] disconnected")
+        success = True
+        for fd_name in ("command_fd", "servo_fd"):
+            fd = getattr(self, fd_name)
+            if fd is None or fd == -1:
+                setattr(self, fd_name, None)
+                continue
+            try:
+                nrc_interface.disconnect_robot(fd)
+                setattr(self, fd_name, None)
+            except Exception as error:
+                Logger.instance().error(f"[{self.name}] disconnect {fd_name} failed: {error}")
+                success = False
         self.is_connected = False
-        return True
+        self.is_enabled = False
+        if success:
+            Logger.instance().info(f"[{self.name}] disconnected")
+        return success
 
     def Enable(self) -> bool:
         nrc_interface.set_servo_state(self.command_fd,1)
@@ -136,13 +150,13 @@ class NrcArm(BaseRobotArm):
 
                 if result != 0:
                     Logger.instance().error(f"[{self.name}] get_current_position failed: {result}")
-                    return [0.0] * self.MAX_JOINT_COUNT
+                    return []
 
                 return [float(value) for value in output]
 
         except Exception as e:
                 Logger.instance().error(f"[{self.name}] get_current_position error: {e}")
-                return [0.0] * self.MAX_JOINT_COUNT
+                return []
 
     def Get_tcp_positions(self) -> list:
         try:
@@ -157,13 +171,13 @@ class NrcArm(BaseRobotArm):
 
                 if result != 0:
                     Logger.instance().error(f"[{self.name}] get_current_position failed: {result}")
-                    return [0.0] * self.TCP_DIM
+                    return []
 
                 return [float(value) for value in output][:self.TCP_DIM]
 
         except Exception as e:
                 Logger.instance().error(f"[{self.name}] get_current_position error: {e}")
-                return [0.0] * self.TCP_DIM
+                return []
 
     def Move_j(
         self,
@@ -314,5 +328,3 @@ class NrcArm(BaseRobotArm):
             return False
 
         #endregion
-
-

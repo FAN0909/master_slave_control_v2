@@ -37,7 +37,7 @@ class CameraThread(QObject):
             if device.Connect():
                 self.sig_connect_result.emit(True, f"[{device.name}] 已连接")
                 return True
-            message = device.last_error or f"[{device.name}] 连接失败"
+            message = getattr(device, "last_error", "") or f"[{device.name}] 连接失败"
         except Exception as error:
             message = f"连接失败：{error}"
         if self.device is not None:
@@ -45,7 +45,7 @@ class CameraThread(QObject):
                 if self.device.Disconnect():
                     self.device = None
                 else:
-                    message += f"；清理失败：{self.device.last_error}"
+                    message += f"；清理失败：{getattr(self.device, 'last_error', '')}"
             except Exception as error:
                 message += f"；清理失败：{error}"
         self._error(message)
@@ -60,7 +60,7 @@ class CameraThread(QObject):
             return False
         try:
             success = self.device.Disconnect()
-            message = self.device.last_error or f"[{self.device.name}] 断开失败"
+            message = getattr(self.device, "last_error", "") or f"[{self.device.name}] 断开失败"
         except Exception as error:
             success = False
             message = f"断开失败：{error}"
@@ -102,7 +102,7 @@ class CameraThread(QObject):
             return False
         try:
             success = bool(getattr(self.device, name)(*args))
-            message = "指令已发送" if success else (self.device.last_error or "指令失败")
+            message = "指令已发送" if success else (getattr(self.device, "last_error", "") or "指令失败")
         except Exception as error:
             success = False
             message = f"{name} 失败：{error}"
@@ -121,8 +121,8 @@ class CameraThread(QObject):
         try:
             device = self.device or self._create_device(model, **options)
             devices = device.list_devices()
-            if device.last_error:
-                self._error(device.last_error)
+            if getattr(device, "last_error", ""):
+                self._error(getattr(device, "last_error", ""))
         except Exception as error:
             devices = []
             self._error(f"相机枚举失败：{error}")
@@ -135,8 +135,12 @@ class CameraThread(QObject):
             return None
         try:
             frame = self.device.Get_color_frame()
-            if self.device.last_error:
-                raise RuntimeError(self.device.last_error)
+            if not self.device.is_connected:
+                self.StopPolling()
+                self._error("相机读取失败，设备连接已断开；已停止轮询")
+                return None
+            if getattr(self.device, "last_error", ""):
+                raise RuntimeError(getattr(self.device, "last_error", ""))
         except Exception as error:
             self.StopPolling()
             self._error(f"相机读取失败：{error}")

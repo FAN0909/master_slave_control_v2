@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
+
 import numpy as np
+
+
 class BaseCamera(ABC):
     """Abstract base class for Camera devices.
 
@@ -10,17 +13,16 @@ class BaseCamera(ABC):
     def __init__(self, name: str):
         self.name = name
         self.is_connected = False
-        self.is_enabled = False
 
     @abstractmethod
     def Connect(self) -> bool:
         """Connect to the camera."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Disconnect(self) -> bool:
         """Disconnect from the camera."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Get_color_frame(self) -> np.ndarray | None:

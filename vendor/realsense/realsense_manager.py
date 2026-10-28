@@ -43,10 +43,9 @@ class RealSenseManager:
 
     def disconnect(self):
         if self.pipeline is not None:
-            try:
-                self.pipeline.stop()
-            except Exception:
-                pass
+            # Keep the pipeline reference if stop fails so callers can report
+            # the failure and retry cleanup instead of claiming disconnection.
+            self.pipeline.stop()
         self.pipeline = None
         self.config = None
 

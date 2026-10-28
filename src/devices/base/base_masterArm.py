@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class BaseMasterArm(ABC):
     """Abstract base class for robot arm devices.
 
@@ -15,30 +16,29 @@ class BaseMasterArm(ABC):
     @abstractmethod
     def Connect(self) -> bool:
         """Connect to the robot arm and return the socket connection."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Disconnect(self) -> bool:
         """Disconnect from the robot arm."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Enable(self) -> bool:
         """Enable the robot arm."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Disable(self) -> bool:
         """Disable the robot arm."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Get_joint_positions(self) -> list:
         """Read joint positions in degrees, in device joint order."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def Get_tcp_positions(self) -> list:
         """Read the current TCP positions."""
-        pass
-
+        raise NotImplementedError

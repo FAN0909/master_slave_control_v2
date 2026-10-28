@@ -1,6 +1,6 @@
 {
   "NRC": {
-    "MAX_JOINT_COUNT": 6,
+    "MAX_JOINT_COUNT": 7,
     "TCP_DIM": 6,
     "JOINT_COORD": 0,
     "TCP_COORD": 1,

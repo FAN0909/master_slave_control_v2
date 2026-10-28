@@ -1,7 +1,7 @@
 import numpy as np
 
 from src.devices.base.base_camera import BaseCamera
-from src.ui.log_stream import Logger
+from src.log import Logger
 from vendor.realsense.realsense_manager import RealSenseManager
 
 
@@ -18,8 +18,10 @@ class CameraD435(BaseCamera):
         return self.camera_manager.list_devices()
 
     def Connect(self) -> bool:
-        if self.is_connected:
+        if self.camera_manager.is_connected():
+            self.is_connected = True
             return True
+        self.is_connected = False
         try:
             self.camera_manager.connect(self.serial_number)
             self.is_connected = self.camera_manager.is_connected()
@@ -27,8 +29,8 @@ class CameraD435(BaseCamera):
                 Logger.instance().error(f"[{self.name}] connect failed: camera is not connected")
             return self.is_connected
         except Exception as error:
+            self.is_connected = self.camera_manager.is_connected()
             Logger.instance().error(f"[{self.name}] connect failed: {error}")
-            self.is_connected = False
             return False
 
     def Disconnect(self) -> bool:
@@ -48,5 +50,6 @@ class CameraD435(BaseCamera):
         try:
             return self.camera_manager.get_color_frame()
         except Exception as error:
+            self.is_connected = self.camera_manager.is_connected()
             Logger.instance().error(f"[{self.name}] get color frame failed: {error}")
-            return None
+            raise
