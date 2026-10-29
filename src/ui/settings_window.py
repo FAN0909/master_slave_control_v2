@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'settings_window.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.11.2
+## Created by: Qt User Interface Compiler version 6.12.0
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -539,6 +539,79 @@ class Ui_SettingsDialog(object):
         self.tab_handset.setObjectName(u"tab_handset")
         self.verticalLayout_hand = QVBoxLayout(self.tab_handset)
         self.verticalLayout_hand.setObjectName(u"verticalLayout_hand")
+        self.groupBox_hand_positions = QGroupBox(self.tab_handset)
+        self.groupBox_hand_positions.setObjectName(u"groupBox_hand_positions")
+        self.gridLayout_hand_positions = QGridLayout(self.groupBox_hand_positions)
+        self.gridLayout_hand_positions.setObjectName(u"gridLayout_hand_positions")
+        self.label_hand_joint0 = QLabel(self.groupBox_hand_positions)
+        self.label_hand_joint0.setObjectName(u"label_hand_joint0")
+
+        self.gridLayout_hand_positions.addWidget(self.label_hand_joint0, 0, 0, 1, 1)
+
+        self.lineEdit_hand_joint0 = QLineEdit(self.groupBox_hand_positions)
+        self.lineEdit_hand_joint0.setObjectName(u"lineEdit_hand_joint0")
+        self.lineEdit_hand_joint0.setReadOnly(True)
+
+        self.gridLayout_hand_positions.addWidget(self.lineEdit_hand_joint0, 0, 1, 1, 1)
+
+        self.label_hand_joint1 = QLabel(self.groupBox_hand_positions)
+        self.label_hand_joint1.setObjectName(u"label_hand_joint1")
+
+        self.gridLayout_hand_positions.addWidget(self.label_hand_joint1, 1, 0, 1, 1)
+
+        self.lineEdit_hand_joint1 = QLineEdit(self.groupBox_hand_positions)
+        self.lineEdit_hand_joint1.setObjectName(u"lineEdit_hand_joint1")
+        self.lineEdit_hand_joint1.setReadOnly(True)
+
+        self.gridLayout_hand_positions.addWidget(self.lineEdit_hand_joint1, 1, 1, 1, 1)
+
+        self.label_hand_joint2 = QLabel(self.groupBox_hand_positions)
+        self.label_hand_joint2.setObjectName(u"label_hand_joint2")
+
+        self.gridLayout_hand_positions.addWidget(self.label_hand_joint2, 2, 0, 1, 1)
+
+        self.lineEdit_hand_joint2 = QLineEdit(self.groupBox_hand_positions)
+        self.lineEdit_hand_joint2.setObjectName(u"lineEdit_hand_joint2")
+        self.lineEdit_hand_joint2.setReadOnly(True)
+
+        self.gridLayout_hand_positions.addWidget(self.lineEdit_hand_joint2, 2, 1, 1, 1)
+
+        self.label_hand_joint3 = QLabel(self.groupBox_hand_positions)
+        self.label_hand_joint3.setObjectName(u"label_hand_joint3")
+
+        self.gridLayout_hand_positions.addWidget(self.label_hand_joint3, 0, 2, 1, 1)
+
+        self.lineEdit_hand_joint3 = QLineEdit(self.groupBox_hand_positions)
+        self.lineEdit_hand_joint3.setObjectName(u"lineEdit_hand_joint3")
+        self.lineEdit_hand_joint3.setReadOnly(True)
+
+        self.gridLayout_hand_positions.addWidget(self.lineEdit_hand_joint3, 0, 3, 1, 1)
+
+        self.label_hand_joint4 = QLabel(self.groupBox_hand_positions)
+        self.label_hand_joint4.setObjectName(u"label_hand_joint4")
+
+        self.gridLayout_hand_positions.addWidget(self.label_hand_joint4, 1, 2, 1, 1)
+
+        self.lineEdit_hand_joint4 = QLineEdit(self.groupBox_hand_positions)
+        self.lineEdit_hand_joint4.setObjectName(u"lineEdit_hand_joint4")
+        self.lineEdit_hand_joint4.setReadOnly(True)
+
+        self.gridLayout_hand_positions.addWidget(self.lineEdit_hand_joint4, 1, 3, 1, 1)
+
+        self.label_hand_joint5 = QLabel(self.groupBox_hand_positions)
+        self.label_hand_joint5.setObjectName(u"label_hand_joint5")
+
+        self.gridLayout_hand_positions.addWidget(self.label_hand_joint5, 2, 2, 1, 1)
+
+        self.lineEdit_hand_joint5 = QLineEdit(self.groupBox_hand_positions)
+        self.lineEdit_hand_joint5.setObjectName(u"lineEdit_hand_joint5")
+        self.lineEdit_hand_joint5.setReadOnly(True)
+
+        self.gridLayout_hand_positions.addWidget(self.lineEdit_hand_joint5, 2, 3, 1, 1)
+
+
+        self.verticalLayout_hand.addWidget(self.groupBox_hand_positions)
+
         self.groupBox_3 = QGroupBox(self.tab_handset)
         self.groupBox_3.setObjectName(u"groupBox_3")
         self.verticalLayout_5 = QVBoxLayout(self.groupBox_3)
@@ -732,6 +805,13 @@ class Ui_SettingsDialog(object):
         self.tabWidget_settings.setTabText(self.tabWidget_settings.indexOf(self.tab_robotset), QCoreApplication.translate("SettingsDialog", u"Robot Set", None))
         self.label_camera.setText(QCoreApplication.translate("SettingsDialog", u"\u76f8\u673a\u8bbe\u7f6e", None))
         self.tabWidget_settings.setTabText(self.tabWidget_settings.indexOf(self.tab_cameraset), QCoreApplication.translate("SettingsDialog", u"Camera Set", None))
+        self.groupBox_hand_positions.setTitle(QCoreApplication.translate("SettingsDialog", u"Current Pos", None))
+        self.label_hand_joint0.setText(QCoreApplication.translate("SettingsDialog", u"thumb", None))
+        self.label_hand_joint1.setText(QCoreApplication.translate("SettingsDialog", u"palm", None))
+        self.label_hand_joint2.setText(QCoreApplication.translate("SettingsDialog", u"index", None))
+        self.label_hand_joint3.setText(QCoreApplication.translate("SettingsDialog", u"middle", None))
+        self.label_hand_joint4.setText(QCoreApplication.translate("SettingsDialog", u"ring", None))
+        self.label_hand_joint5.setText(QCoreApplication.translate("SettingsDialog", u"pinky", None))
         self.groupBox_3.setTitle(QCoreApplication.translate("SettingsDialog", u"Actions", None))
         self.label_hand_model_settings.setText(QCoreApplication.translate("SettingsDialog", u"\u578b\u53f7", None))
         self.label_hand_model_value.setText(QCoreApplication.translate("SettingsDialog", u"\u672a\u9009\u62e9", None))

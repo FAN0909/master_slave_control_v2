@@ -23,7 +23,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget_settings">
      <property name="currentIndex">
-      <number>0</number>
+      <number>2</number>
      </property>
      <widget class="QWidget" name="tab_robotset">
       <attribute name="title">
@@ -680,6 +680,99 @@
        <string>Hand Set</string>
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_hand">
+       <item>
+        <widget class="QGroupBox" name="groupBox_hand_positions">
+         <property name="title">
+          <string>Current Pos</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_hand_positions">
+          <item row="0" column="3">
+           <widget class="QLineEdit" name="lineEdit_hand_joint3">
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="lineEdit_hand_joint0">
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_hand_joint0">
+            <property name="text">
+             <string>thumb</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="2">
+           <widget class="QLabel" name="label_hand_joint3">
+            <property name="text">
+             <string>middle</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="4">
+           <widget class="QLabel" name="label_hand_joint1">
+            <property name="text">
+             <string>palm</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="5">
+           <widget class="QLineEdit" name="lineEdit_hand_joint1">
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_hand_joint4">
+            <property name="text">
+             <string>ring</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="lineEdit_hand_joint4">
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="label_hand_joint2">
+            <property name="text">
+             <string>index</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
+           <widget class="QLineEdit" name="lineEdit_hand_joint2">
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="4">
+           <widget class="QLabel" name="label_hand_joint5">
+            <property name="text">
+             <string>pinky</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="5">
+           <widget class="QLineEdit" name="lineEdit_hand_joint5">
+            <property name="readOnly">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
        <item>
         <widget class="QGroupBox" name="groupBox_3">
          <property name="title">

@@ -158,6 +158,9 @@ class MainWindow(QMainWindow):
         self.request_hand_connect.connect(self.hand_worker.connect_device)
         self.request_hand_disconnect.connect(self.hand_worker.disconnect_device)
         self.hand_worker.sig_connection_changed.connect(self._on_hand_connection_changed)
+        self.hand_worker.sig_joint_positions.connect(
+            self.set_dialog.update_hand_joint_positions
+        )
         self.hand_thread.finished.connect(self.hand_worker.disconnect_device)
         self.hand_thread.finished.connect(self.hand_worker.deleteLater)
         self.hand_thread.start()

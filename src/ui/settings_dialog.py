@@ -48,3 +48,10 @@ class SettingsDialog(QDialog):
             return
         for axis, position in zip("xyzabc", positions):
             getattr(self.ui, f"lineEdit_slave_{axis}").setText(f"{position:.2f}")
+
+    @Slot(list)
+    def update_hand_joint_positions(self, positions: list) -> None:
+        if len(positions) != 6:
+            return
+        for index, position in enumerate(positions):
+            getattr(self.ui, f"lineEdit_hand_joint{index}").setText(f"{position:g}")
