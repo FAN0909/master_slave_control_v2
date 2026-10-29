@@ -34,25 +34,15 @@ class LinkHand(BaseHand):
         self.modbus = modbus
         self.can = can
         self.is_connected = False
-        self.is_enabled = False
         self.hand_api = None  # Placeholder for the actual hand API instance
 
+    @property
     def MAX_JOINTS(self) -> int:
-        if (self.hand_joint.upper() == "O6" or self.hand_joint.upper() == "L6"):
-            return 6
-        elif self.hand_joint.upper() == "L7":
-            return 7
-        elif self.hand_joint.upper() == "L10":
-            return 10
-        elif self.hand_joint.upper() == "L20":
-            return 20
-        elif self.hand_joint.upper() == "G20":
-            return 20
-        elif self.hand_joint.upper() == "L21":
-            return 25
-        elif self.hand_joint.upper() == "L25":
-            return 25
-        return 0
+        mapping = {
+            "O6": 6, "L6": 6, "L7": 7, "L10": 10,
+            "L20": 20, "G20": 20, "L21": 25, "L25": 25
+        }
+        return mapping.get(self.hand_joint.upper(), 0)
 
     def Connect(self) -> bool:
         # Implement the connection logic for LinkHandO6
@@ -93,7 +83,7 @@ class LinkHand(BaseHand):
                 Logger.instance().error(f"[{self.name}] hand API not connected")
                 return False
 
-            max_joints = self.MAX_JOINTS()
+            max_joints = self.MAX_JOINTS
             if max_joints <= 0:
                 Logger.instance().error(f"[{self.name}] unsupported joint type: {self.hand_joint}")
                 return False
@@ -122,7 +112,7 @@ class LinkHand(BaseHand):
             if positions is None:
                 raise ValueError("SDK returned no joint positions")
             joint_positions = [float(value) for value in positions]
-            if len(joint_positions) != self.MAX_JOINTS() or not all(
+            if len(joint_positions) != self.MAX_JOINTS or not all(
                 math.isfinite(value) for value in joint_positions
             ):
                 raise ValueError(f"invalid joint positions: {joint_positions}")
