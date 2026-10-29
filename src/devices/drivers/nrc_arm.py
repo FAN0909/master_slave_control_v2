@@ -18,28 +18,25 @@ class NrcArm(BaseRobotArm):
         ip_address: str = "192.168.2.14",
         command_port: int = 6001,
         servo_port: int = 7000,
-        config_path=None,
     ):
-
         super().__init__(name)
-        self.config_path = Path(config_path) if config_path is not None else self.CONFIG_PATH
-        self._load_config(self.config_path)
+        self._load_config(self.CONFIG_PATH)
 
         self.ip_address = ip_address
         self.command_port = command_port
         self.servo_port = servo_port
+
         self.servo_fd = None
         self.command_fd = None
         self.is_connected = False
         self.is_enabled = False
-        self.last_error = ""
 
     def _load_config(self, path):
         """创建驱动和连接前读取配置，跟随循环不访问磁盘。"""
         try:
             with path.open(encoding="utf-8") as file:
                 config = json.load(file)["NRC"]
-            for key in ("MAX_JOINT_COUNT", "TCP_DIM"):
+            for key in ("JOINT_COUNT", "TCP_COUNT"):
                 value = config[key]
                 if type(value) is not int or value <= 0:
                     raise ValueError(f"{key} 必须是正整数")
@@ -61,11 +58,12 @@ class NrcArm(BaseRobotArm):
     def Connect(self) -> bool:
         global nrc_interface
         try:
-            self.last_error = ""
             if nrc_interface is None:
                 from vendor.nrc import nrc_interface as sdk
                 nrc_interface = sdk
-            self._load_config(self.config_path)
+
+            #连接前先加载配置文件  以后修改配置文件后重新连接即可生效
+            self._load_config(self.CONFIG_PATH)
             Logger.instance().info(f"[{self.name}] connecting to {self.ip_address}:{self.command_port} and {self.servo_port}...")
             self.command_fd = nrc_interface.connect_robot(self.ip_address, str(self.command_port))
             if self.command_fd == -1:
@@ -89,10 +87,8 @@ class NrcArm(BaseRobotArm):
             return True
         except Exception as e:
             self.Disconnect()
-            self.last_error = f"NRC 连接失败：{e}"
-            if isinstance(e, (ImportError, OSError)):
-                self.last_error += "；请检查 Python 3.12、系统架构及 ldd vendor/nrc/_nrc_host.so"
-            Logger.instance().error(f"[{self.name}] {self.last_error}")
+            error = f"NRC 连接失败：{e}"
+            Logger.instance().error(f"[{self.name}] {error}")
             self.is_connected = False
             return False
 
@@ -110,7 +106,6 @@ class NrcArm(BaseRobotArm):
                 Logger.instance().error(f"[{self.name}] disconnect {fd_name} failed: {error}")
                 success = False
         self.is_connected = False
-        self.is_enabled = False
         if success:
             Logger.instance().info(f"[{self.name}] disconnected")
         return success
@@ -140,7 +135,7 @@ class NrcArm(BaseRobotArm):
     def Get_joint_positions(self) -> list:
         try:
                 output = nrc_interface.VectorDouble()
-                output.resize(self.MAX_JOINT_COUNT)
+                output.resize(self.JOINT_COUNT)
 
                 result = nrc_interface.get_current_position(
                     self.command_fd,
@@ -161,7 +156,7 @@ class NrcArm(BaseRobotArm):
     def Get_tcp_positions(self) -> list:
         try:
                 output = nrc_interface.VectorDouble()
-                output.resize(self.MAX_JOINT_COUNT)
+                output.resize(self.TCP_COUNT)
 
                 result = nrc_interface.get_current_position(
                     self.command_fd,
@@ -173,7 +168,7 @@ class NrcArm(BaseRobotArm):
                     Logger.instance().error(f"[{self.name}] get_current_position failed: {result}")
                     return []
 
-                return [float(value) for value in output][:self.TCP_DIM]
+                return [float(value) for value in output][:self.TCP_COUNT]
 
         except Exception as e:
                 Logger.instance().error(f"[{self.name}] get_current_position error: {e}")
@@ -188,7 +183,7 @@ class NrcArm(BaseRobotArm):
     ) -> bool:
 
         # 1. 检查关节数量
-        if len(joint_positions) != self.MAX_JOINT_COUNT:
+        if len(joint_positions) < self.JOINT_COUNT-1:
             return False
 
         # 2. 创建 MoveJ 指令
@@ -201,7 +196,7 @@ class NrcArm(BaseRobotArm):
         cmd.coord = self.JOINT_COORD
 
         # 4. 设置目标位置
-        cmd.targetPosValue.resize(self.MAX_JOINT_COUNT)
+        cmd.targetPosValue.resize(self.JOINT_COUNT)
 
         for i, position in enumerate(joint_positions):
             cmd.targetPosValue[i] = position
@@ -226,9 +221,9 @@ class NrcArm(BaseRobotArm):
         if not self.is_connected:
             return False
 
-        # TCP 点位应该包含 6 个值：
+        # TCP 点位应该包含 6 个值： 纳博特要写7个 第七个写0就行
         # X, Y, Z, Rx, Ry, Rz
-        if len(tcp_positions) != 6:
+        if len(tcp_positions) < self.TCP_COUNT-1:
             return False
 
         cmd = nrc_interface.MoveCmd()
@@ -242,20 +237,19 @@ class NrcArm(BaseRobotArm):
         cmd.coord = self.TCP_COORD
 
         # 设置目标位置
-        cmd.targetPosValue.resize(self.MAX_JOINT_COUNT)
+        cmd.targetPosValue.resize(self.TCP_COUNT)
 
         for i, position in enumerate(tcp_positions):
             cmd.targetPosValue[i] = float(position)
 
-        # 其余位置补 0
-        for i in range(len(tcp_positions), self.MAX_JOINT_COUNT):
+        # 其余位置补 0 
+        for i in range(len(tcp_positions), self.TCP_COUNT):
             cmd.targetPosValue[i] = 0.0
 
         # 调用 SDK
         result = nrc_interface.robot_movel(
             self.command_fd,
-            self.robot_num,
-            cmd
+            cmd,
         )
 
         return result == 0
@@ -272,9 +266,9 @@ class NrcArm(BaseRobotArm):
         try:
 
             # servoJ 约束
-            vMax  = nrc_interface.VectorDouble([self.SERVO_J_VMAX]  * self.MAX_JOINT_COUNT)
-            avMax = nrc_interface.VectorDouble([self.SERVO_J_AVMAX] * self.MAX_JOINT_COUNT)
-            jMax  = nrc_interface.VectorDouble([self.SERVO_J_JMAX]  * self.MAX_JOINT_COUNT)
+            vMax  = nrc_interface.VectorDouble([self.SERVO_J_VMAX]  * self.JOINT_COUNT)
+            avMax = nrc_interface.VectorDouble([self.SERVO_J_AVMAX] * self.JOINT_COUNT)
+            jMax  = nrc_interface.VectorDouble([self.SERVO_J_JMAX]  * self.JOINT_COUNT)
 
             result = nrc_interface.open_servoJ(
                 self.servo_fd, vMax, avMax, jMax
@@ -314,9 +308,13 @@ class NrcArm(BaseRobotArm):
             Logger.instance().error(f"[{self.name}] set_servoJ_pos failed: invalid servo_fd")
             return False
 
+        if len(target_positions) < self.JOINT_COUNT-1:
+            Logger.instance().error(f"[{self.name}] 目标关节数量不匹配")
+            return False
+
         try:
             pos = nrc_interface.VectorDouble()
-            pos.resize(self.MAX_JOINT_COUNT)
+            pos.resize(self.JOINT_COUNT)
             for i, v in enumerate(target_positions):
                 pos[i] = float(v)
 
