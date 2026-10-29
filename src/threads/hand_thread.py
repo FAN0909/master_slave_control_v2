@@ -11,7 +11,7 @@ class HandThread(QObject):
         self.device = None
         self.is_connect = False
 
-    @Slot(str, dict)
+
     def Connect(self, model: str, options: dict) -> bool:
         if self.device is not None:
             try:
@@ -41,26 +41,62 @@ class HandThread(QObject):
         self.is_connect = False
         return False
 
+
     def Disconnect(self) -> bool:
-        pass
+        if self.device is None:
+            return False
 
+        try:
+            if not self.device.Disconnect():
+                logging.error("灵巧手断开失败")
+                return False
+        except Exception:
+            logging.exception("灵巧手断开失败")
+            return False
 
-
+        self.device = None
+        self.is_connect = False
+        return True
 
     def _create_device(self, model: str, **options):
         return create_hand(model, **options)
 
 
     def Get_joint_positions(self) -> list:
-        pass
+        if self.device is None or not self.device.is_connected:
+            self.is_connect = False
+            return []
+
+        try:
+            positions = self.device.Get_joint_positions()
+        except Exception:
+            logging.exception("灵巧手读取关节位置失败")
+            self.is_connect = bool(self.device.is_connected)
+            return []
+
+        self.is_connect = bool(self.device.is_connected)
+        return positions if positions is not None else []
 
 
+    def _set_values(self, method: str, values: list) -> bool:
+        if self.device is None or not self.device.is_connected:
+            self.is_connect = False
+            return False
+
+        try:
+            success = bool(getattr(self.device, method)(values))
+        except Exception:
+            logging.exception("灵巧手执行 %s 失败", method)
+            success = False
+
+        self.is_connect = bool(self.device.is_connected)
+        return success
 
     def Set_joint_positions(self, positions: list) -> bool:
-        pass
+        return self._set_values("Set_joint_positions", positions)
 
     def Set_speed(self, speed: list) -> bool:
-        pass
+        return self._set_values("Set_speed", speed)
 
     def Set_force(self, force: list) -> bool:
-        pass
+        return self._set_values("Set_force", force)
