@@ -3,23 +3,66 @@ import logging
 import math
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from src.devices.drivers_factory import create_hand
+from src.log import Logger
 
 class HandThread(QObject):
+    sig_connection_changed = Signal(bool)
+    sig_joint_positions = Signal(list)
 
     def __init__(self):
         super().__init__()
         self.device = None
         self.is_connect = False
+        self.read_timer = QTimer(self)
+        self.read_timer.timeout.connect(self.read_joint_pos)
+
+    def start_timer_work(self, interval_ms: int) -> bool:
+        if interval_ms <= 0 or not self.is_connect:
+            return False
+        if self.read_timer.isActive():
+            self.read_timer.setInterval(interval_ms)
+        else:
+            self.read_timer.start(interval_ms)
+        return True
+
+    def stop_timer_work(self) -> None:
+        if self.read_timer.isActive():
+            self.read_timer.stop()
+
+    @Slot()
+    def read_joint_pos(self) -> None:
+        positions = self.Get_joint_positions()
+        if positions:
+            self.sig_joint_positions.emit(positions)
+        elif not self.is_connect:
+            self.stop_timer_work()
+            self.sig_connection_changed.emit(False)
+
+    @Slot(str, dict, int)
+    def connect_device(self, model: str, options: dict, interval_ms: int) -> None:
+        if self.Connect(model, options):
+            Logger.instance().info(f"灵巧手已连接：{model}，{options['comm_info']}")
+            self.start_timer_work(interval_ms)
+        self.sig_connection_changed.emit(self.is_connect)
+
+    @Slot()
+    def disconnect_device(self) -> None:
+        if self.device is not None:
+            if self.Disconnect():
+                Logger.instance().info("灵巧手已断开")
+            else:
+                Logger.instance().error("灵巧手断开失败")
+        self.sig_connection_changed.emit(self.is_connect)
 
 
     def Connect(self, model: str, options: dict) -> bool:
         if self.device is not None:
             try:
                 if not self.device.Disconnect():
-                    logging.error("已有灵巧手断开失败，无法连接新设备")
+                    Logger.instance().error("已有灵巧手断开失败，无法连接新设备")
                     return False
-            except Exception:
-                logging.exception("已有灵巧手断开失败，无法连接新设备")
+            except Exception as error:
+                Logger.instance().error(f"已有灵巧手断开失败：{error}")
                 return False
             self.device = None
             self.is_connect = False
@@ -29,8 +72,8 @@ class HandThread(QObject):
             if self.device.Connect():
                 self.is_connect = True
                 return True
-        except Exception:
-            logging.exception("灵巧手连接失败：%s", model)
+        except (Exception, SystemExit) as error:
+            Logger.instance().error(f"灵巧手连接失败：{error}")
 
         if self.device is not None:
             try:
@@ -44,6 +87,7 @@ class HandThread(QObject):
 
     @Slot()
     def Disconnect(self) -> bool:
+        self.stop_timer_work()
         if self.device is None:
             return False
 

@@ -36,6 +36,8 @@ class MainWindow(QMainWindow):
     request_slave_disconnect = Signal()
     request_slave_power_on = Signal()
     request_slave_power_off = Signal()
+    request_hand_connect = Signal(str, dict, int)
+    request_hand_disconnect = Signal()
 
     def __init__(self):
         super().__init__()
@@ -46,6 +48,7 @@ class MainWindow(QMainWindow):
         self.master_connected = False
         self.slave_connected = False
         self.slave_enabled = False
+        self.hand_connected = False
 
 
         self.init_ui()
@@ -61,6 +64,7 @@ class MainWindow(QMainWindow):
         for label in (
             self.ui.label_master_status,
             self.ui.label_slave_status,
+            self.ui.label_hand_status,
             self.ui.label_camera_status_1,
             self.ui.label_camera_status_2,
             self.ui.label_camera_status_3,
@@ -83,6 +87,12 @@ class MainWindow(QMainWindow):
         self.ui.Btn_robot_connect.clicked.connect(self._toggle_slave_connection)
         self.ui.pushButton_robot_PowerOn.clicked.connect(self._toggle_slave_power)
         self.ui.pushButton_robot_PowerOn.setEnabled(False)
+
+        # hand 相关按钮
+        self.ui.pushButton_refresh_hand_connect_info.clicked.connect(
+            self._refresh_hand_comm_info
+        )
+        self.ui.pushButton_connect_hand.clicked.connect(self._toggle_hand_connection)
 
     #打开设置界面
     def _open_settings(self) -> None:
@@ -145,7 +155,10 @@ class MainWindow(QMainWindow):
         self.hand_thread = QThread(self)
         self.hand_worker = HandThread()
         self.hand_worker.moveToThread(self.hand_thread)
-        self.hand_thread.finished.connect(self.hand_worker.Disconnect)
+        self.request_hand_connect.connect(self.hand_worker.connect_device)
+        self.request_hand_disconnect.connect(self.hand_worker.disconnect_device)
+        self.hand_worker.sig_connection_changed.connect(self._on_hand_connection_changed)
+        self.hand_thread.finished.connect(self.hand_worker.disconnect_device)
         self.hand_thread.finished.connect(self.hand_worker.deleteLater)
         self.hand_thread.start()
 
@@ -304,7 +317,94 @@ class MainWindow(QMainWindow):
 #endregion====================================slave相关=============================================
 
 #region====================================hand相关================================================
+    @Slot()
+    def _refresh_hand_comm_info(self):
+        combo = self.ui.comboBox_hand_comm_info
+        selected_info = combo.currentData()
+        comm_type = self.ui.comboBox_hand_comm_type.currentText()
+        try:
+            if comm_type == "Modbus":
+                empty_text = "无可用 USB 串口"
+                interfaces = sorted(
+                    port.device
+                    for port in list_ports.comports()
+                    if port.vid is not None and port.pid is not None
+                )
+            elif comm_type == "Can":
+                empty_text = "无可用 CAN 接口"
+                interfaces = sorted(
+                    interface.name
+                    for interface in Path("/sys/class/net").iterdir()
+                    if (interface / "type").read_text().strip() == "280"
+                )
+            else:
+                self.logger.error(f"不支持的灵巧手通信方式：{comm_type}")
+                return
+        except (OSError, ValueError) as error:
+            self.logger.error(f"刷新灵巧手通信接口失败：{error}")
+            interfaces = []
 
+        combo.clear()
+        for interface in interfaces:
+            combo.addItem(interface, interface)
+        if interfaces:
+            index = combo.findData(selected_info)
+            combo.setCurrentIndex(index if index >= 0 else 0)
+        else:
+            combo.addItem(empty_text, None)
+        combo.setProperty("commType", comm_type)
+
+    @Slot()
+    def _toggle_hand_connection(self):
+        if self.hand_connected:
+            self.ui.pushButton_connect_hand.setEnabled(False)
+            self._set_connection_status(
+                self.ui.label_hand_status, "● Disconnecting...", "disconnecting"
+            )
+            self.request_hand_disconnect.emit()
+            return
+
+        comm_type = self.ui.comboBox_hand_comm_type.currentText()
+        comm_info = self.ui.comboBox_hand_comm_info.currentData()
+        if self.ui.comboBox_hand_comm_info.property("commType") != comm_type:
+            self.logger.error("请先刷新当前通信方式的接口列表")
+            return
+        if comm_info is None:
+            self.logger.error("请选择灵巧手通信接口")
+            return
+        try:
+            interval_ms = int(self.ui.lineEdit_hand_read_pos_rate.text().strip())
+            if not 0 < interval_ms <= 2_147_483_647:
+                raise ValueError
+        except ValueError:
+            self.logger.error("灵巧手读取周期必须是正整数（毫秒）")
+            return
+
+        model = self.ui.comboBox_hand_model.currentText()
+        options = {
+            "hand_type": self.ui.comboBox_hand_type.currentText(),
+            "hand_joint": model.removeprefix("Linker"),
+            "comm_type": comm_type,
+            "comm_info": comm_info,
+        }
+        self.ui.pushButton_connect_hand.setEnabled(False)
+        self._set_connection_status(
+            self.ui.label_hand_status, "● Connecting...", "connecting"
+        )
+        self.request_hand_connect.emit(model, options, interval_ms)
+
+    @Slot(bool)
+    def _on_hand_connection_changed(self, connected: bool):
+        self.hand_connected = connected
+        self._set_connection_status(
+            self.ui.label_hand_status,
+            "● Connected" if connected else "● Disconnected",
+            "connected" if connected else "disconnected",
+        )
+        self.ui.pushButton_connect_hand.setText(
+            "Disconnect" if connected else "Connect"
+        )
+        self.ui.pushButton_connect_hand.setEnabled(True)
 
 #endregion====================================hand相关================================================
 
