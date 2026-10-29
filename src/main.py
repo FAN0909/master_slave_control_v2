@@ -3,16 +3,20 @@
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import QThread
 from PySide6.QtUiTools import loadUiType
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 if __package__:
     from .log import Logger
+    from .threads.master_robot_thread import MasterRobotThread
     from .ui.settings_dialog import SettingsDialog
 else:
     # 支持在 IDE 中直接运行 src/main.py。
-    from log import Logger
-    from ui.settings_dialog import SettingsDialog
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from src.log import Logger
+    from src.threads.master_robot_thread import MasterRobotThread
+    from src.ui.settings_dialog import SettingsDialog
 
 
 UI_PATH = Path(__file__).resolve().parent / "ui" / "main_window.ui"
@@ -58,7 +62,14 @@ class MainWindow(QMainWindow):
 
     
     def init_master_thread(self):
-        pass
+        self.master_thread = QThread(self)
+        self.master_worker = MasterRobotThread()
+        self.master_worker.moveToThread(self.master_thread)
+        self.master_thread.finished.connect(self.master_worker.deleteLater)
+        
+
+
+        self.master_thread.start()
     def init_slave_thread(self):
         pass
     def init_hand_thread(self):
@@ -67,6 +78,11 @@ class MainWindow(QMainWindow):
         pass
 
 #endregion=================================初始化线程============================================
+    def closeEvent(self, event):
+        self.master_thread.quit()
+        self.master_thread.wait()
+        super().closeEvent(event)
+
     def _append_log(self, _level: str, text: str) -> None:
         log_view = self.ui.plainTextEdit_log
         log_view.appendPlainText(text)
