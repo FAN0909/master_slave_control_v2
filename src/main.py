@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal, Slot
 from PySide6.QtUiTools import loadUiType
-from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtWidgets import QApplication, QLabel, QMainWindow
 from serial.tools import list_ports
 
 if __package__:
@@ -47,6 +47,15 @@ class MainWindow(QMainWindow):
         self.logger.message_logged.connect(self._append_log)
         self.ui.pushButton_clear_log.clicked.connect(self.ui.plainTextEdit_log.clear)
 
+        for label in (
+            self.ui.label_master_status,
+            self.ui.label_slave_status,
+            self.ui.label_camera_status_1,
+            self.ui.label_camera_status_2,
+            self.ui.label_camera_status_3,
+        ):
+            self._set_connection_status(label, "● Disconnected", "disconnected")
+
         #init set ui
         self.set_dialog = SettingsDialog(self)
         #init button connect clicked
@@ -62,6 +71,15 @@ class MainWindow(QMainWindow):
     #打开设置界面
     def _open_settings(self) -> None:
         self.set_dialog.show()
+
+    #设置连接状态标签
+    def _set_connection_status(self, label: QLabel, text: str, state: str) -> None:
+        label.setText(text)
+        label.setProperty("uiRole", "connectionStatus")
+        label.setProperty("connectionState", state)
+        label.style().unpolish(label)
+        label.style().polish(label)
+        label.update()
 
 #endregion==================================初始化界面=============================================
 
@@ -129,7 +147,9 @@ class MainWindow(QMainWindow):
             button.setEnabled(False)
             self.ui.comboBox_master_port.setEnabled(False)
             self.ui.pushButton_refresh_master_port.setEnabled(False)
-            self.ui.label_master_status.setText("● Disconnecting...")
+            self._set_connection_status(
+                self.ui.label_master_status, "● Disconnecting...", "disconnecting"
+            )
             self.request_master_disconnect.emit()
             return
 
@@ -139,14 +159,18 @@ class MainWindow(QMainWindow):
         button.setEnabled(False)
         self.ui.comboBox_master_port.setEnabled(False)
         self.ui.pushButton_refresh_master_port.setEnabled(False)
-        self.ui.label_master_status.setText("● Connecting...")
+        self._set_connection_status(
+            self.ui.label_master_status, "● Connecting...", "connecting"
+        )
         self.request_master_connect.emit("Gello", {"port": port})
 
     @Slot(bool)
     def _on_master_connection_changed(self, connected: bool):
         self.master_connected = connected
-        self.ui.label_master_status.setText(
-            "● Connected" if connected else "● Disconnected"
+        self._set_connection_status(
+            self.ui.label_master_status,
+            "● Connected" if connected else "● Disconnected",
+            "connected" if connected else "disconnected",
         )
         self.ui.pushButton_connect_master_arm.setText(
             "Disconnect" if connected else "Connect"
