@@ -59,6 +59,7 @@ class MainWindow(QMainWindow):
         self.master_connected = False
         self.slave_connected = False
         self.slave_enabled = False
+        self.slave_model = None
         self.hand_connected = False
         self.camera_connected = {camera: False for camera in ("side", "front", "hand")}
 
@@ -333,11 +334,14 @@ class MainWindow(QMainWindow):
         self._set_connection_status(
             self.ui.label_slave_status, "● Connecting...", "connecting"
         )
+        self.slave_model = model
         self.request_slave_connect.emit(model, {"ip_address": ip}, interval_ms)
 
     @Slot(bool)
     def _on_slave_connection_changed(self, connected: bool):
         self.slave_connected = connected
+        if connected and self.slave_model:
+            self.set_dialog.update_slave_config(self.slave_model)
         if not connected:
             self.slave_enabled = False
             self.ui.pushButton_robot_PowerOn.setText("PowerOn")
