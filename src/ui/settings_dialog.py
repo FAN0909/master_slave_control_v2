@@ -32,3 +32,19 @@ class SettingsDialog(QDialog):
             getattr(self.ui, f"lineEdit_master_joint{index}").setText(
                 f"{position:.2f}"
             )
+
+    @Slot(list)
+    def update_slave_joint_positions(self, positions: list) -> None:
+        if len(positions) != 7:
+            return
+        for index, position in enumerate(positions):
+            getattr(self.ui, f"lineEdit_slave_joint{index}").setText(
+                f"{position:.2f}"
+            )
+
+    @Slot(list)
+    def update_slave_tcp_positions(self, positions: list) -> None:
+        if len(positions) < 6:
+            return
+        for axis, position in zip("xyzabc", positions):
+            getattr(self.ui, f"lineEdit_slave_{axis}").setText(f"{position:.2f}")

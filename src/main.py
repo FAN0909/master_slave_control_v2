@@ -30,7 +30,7 @@ Ui_MainWindow, _ = loadUiType(str(UI_PATH))
 class MainWindow(QMainWindow):
     request_master_connect = Signal(str, dict, int)
     request_master_disconnect = Signal()
-    request_slave_connect = Signal(str, dict)
+    request_slave_connect = Signal(str, dict, int)
     request_slave_disconnect = Signal()
     request_slave_power_on = Signal()
     request_slave_power_off = Signal()
@@ -80,6 +80,7 @@ class MainWindow(QMainWindow):
         # slave 相关按钮
         self.ui.Btn_robot_connect.clicked.connect(self._toggle_slave_connection)
         self.ui.pushButton_robot_PowerOn.clicked.connect(self._toggle_slave_power)
+        self.ui.pushButton_robot_PowerOn.setEnabled(False)
 
     #打开设置界面
     def _open_settings(self) -> None:
@@ -128,6 +129,12 @@ class MainWindow(QMainWindow):
         self.request_slave_power_off.connect(self.slave_worker.power_off)
         self.slave_worker.sig_connection_changed.connect(self._on_slave_connection_changed)
         self.slave_worker.sig_power_changed.connect(self._on_slave_power_changed)
+        self.slave_worker.sig_joint_positions.connect(
+            self.set_dialog.update_slave_joint_positions
+        )
+        self.slave_worker.sig_tcp_positions.connect(
+            self.set_dialog.update_slave_tcp_positions
+        )
         self.slave_thread.finished.connect(self.slave_worker.disconnect_device)
         self.slave_thread.finished.connect(self.slave_worker.deleteLater)
         self.slave_thread.start()
@@ -241,11 +248,19 @@ class MainWindow(QMainWindow):
             self.logger.error("从手 IP 地址无效")
             self._on_slave_connection_changed(False)
             return
+        try:
+            interval_ms = int(self.ui.lineEdit_slave_read_pos_rate.text().strip())
+            if not 0 < interval_ms <= 2_147_483_647:
+                raise ValueError
+        except ValueError:
+            self.logger.error("从手读取周期必须是正整数（毫秒）")
+            self._on_slave_connection_changed(False)
+            return
 
         self._set_connection_status(
             self.ui.label_slave_status, "● Connecting...", "connecting"
         )
-        self.request_slave_connect.emit(model, {"ip_address": ip})
+        self.request_slave_connect.emit(model, {"ip_address": ip}, interval_ms)
 
     @Slot(bool)
     def _on_slave_connection_changed(self, connected: bool):

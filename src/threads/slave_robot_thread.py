@@ -12,17 +12,53 @@ from src.log import Logger
 class SlaveRobotThread(QObject):
     sig_connection_changed = Signal(bool)
     sig_power_changed = Signal(bool)
+    sig_joint_positions = Signal(list)
+    sig_tcp_positions = Signal(list)
 
     def __init__(self):
         super().__init__()
         self.device = None
         self.is_connect = False
         self.is_enable = False
+        self.read_timer = QTimer(self)
+        self.read_timer.timeout.connect(self.read_positions)
 
-    @Slot(str, dict)
-    def connect_device(self, model: str, options: dict) -> None:
+    def start_timer_work(self, interval_ms: int) -> bool:
+        if interval_ms <= 0 or not self.is_connect:
+            return False
+        if self.read_timer.isActive():
+            self.read_timer.setInterval(interval_ms)
+        else:
+            self.read_timer.start(interval_ms)
+        return True
+
+    def stop_timer_work(self) -> None:
+        if self.read_timer.isActive():
+            self.read_timer.stop()
+
+    @Slot()
+    def read_positions(self) -> None:
+        joint_positions = self.Get_joint_positions()
+        if not self.is_connect:
+            self.stop_timer_work()
+            self.sig_connection_changed.emit(False)
+            return
+        if joint_positions:
+            self.sig_joint_positions.emit(joint_positions)
+
+        tcp_positions = self.Get_tcp_positions()
+        if not self.is_connect:
+            self.stop_timer_work()
+            self.sig_connection_changed.emit(False)
+            return
+        if tcp_positions:
+            self.sig_tcp_positions.emit(tcp_positions)
+
+    @Slot(str, dict, int)
+    def connect_device(self, model: str, options: dict, interval_ms: int) -> None:
         if self.Connect(model, options):
             Logger.instance().info(f"从手已连接：{model}，IP {options.get('ip_address', '')}")
+            self.start_timer_work(interval_ms)
         self.sig_connection_changed.emit(self.is_connect)
 
     @Slot()
@@ -73,6 +109,7 @@ class SlaveRobotThread(QObject):
 
     @Slot()
     def Disconnect(self) -> bool:
+        self.stop_timer_work()
         if self.device is None:
             return False
 
@@ -104,6 +141,7 @@ class SlaveRobotThread(QObject):
             logging.exception("从手读取关节位置失败")
             positions = []
 
+        self.is_connect = bool(self.device.is_connected)
         return positions if positions is not None else []
 
     @Slot()
@@ -118,6 +156,7 @@ class SlaveRobotThread(QObject):
             logging.exception("从手读取 TCP 位置失败")
             positions = []
 
+        self.is_connect = bool(self.device.is_connected)
         return positions if positions is not None else []
 
 
