@@ -6,14 +6,34 @@ import math
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 from src.devices.drivers_factory import create_master_arm
+from src.log import Logger
 
 
 class MasterRobotThread(QObject):
+    sig_connection_changed = Signal(bool)
 
     def __init__(self):
         super().__init__()
         self.device = None
         self.is_connect = False
+        self.logger = Logger.instance()
+
+    @Slot(str, dict)
+    def connect_device(self, model: str, options: dict) -> None:
+        if self.Connect(model, options):
+            self.logger.info(f"主手已连接：{model}，端口 {options.get('port', '')}")
+        else:
+            self.logger.error(f"主手连接失败：{model}，端口 {options.get('port', '')}")
+        self.sig_connection_changed.emit(self.is_connect)
+
+    @Slot()
+    def disconnect_device(self) -> None:
+        if self.device is not None:
+            if self.Disconnect():
+                self.logger.info("主手已断开")
+            else:
+                self.logger.error("主手断开失败")
+        self.sig_connection_changed.emit(self.is_connect)
 
 
     def Connect(self, model: str, options: dict) -> bool:
@@ -68,4 +88,3 @@ class MasterRobotThread(QObject):
 
         self.is_connect = bool(self.device.is_connected)
         return positions if positions is not None else []
-
