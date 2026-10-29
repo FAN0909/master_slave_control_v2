@@ -7,7 +7,6 @@ from src.devices.base.base_masterArm import BaseMasterArm
 from src.log import Logger
 from vendor.gello.dynamixel import DynamixelDriver
 
-
 class GelloArm(BaseMasterArm):
     CONFIG_PATH = Path(__file__).resolve().parents[3] / "config" / "master_arm.json"
 
@@ -28,6 +27,8 @@ class GelloArm(BaseMasterArm):
         self.max_retries = max_retries
         self.use_fake_fallback = use_fake_fallback
 
+        self.is_connected = False
+
         self.dynamixel_driver = None
 
     def _load_config(self):
@@ -35,21 +36,21 @@ class GelloArm(BaseMasterArm):
         try:
             with self.CONFIG_PATH.open(encoding="utf-8") as file:
                 config = json.load(file)["Gello"]
-            joint_count = config["MAX_JOINT_COUNT"]
-            tcp_dim = config["TCP_DIM"]
+            joint_count = config["JOINT_COUNT"]
+            tcp_count = config["TCP_COUNT"]
             if type(joint_count) is not int or joint_count <= 0:
-                raise ValueError("MAX_JOINT_COUNT 必须是正整数")
-            if type(tcp_dim) is not int or tcp_dim < 0:
-                raise ValueError("TCP_DIM 必须是非负整数")
+                raise ValueError("JOINT_COUNT 必须是正整数")
+            if type(tcp_count) is not int or tcp_count < 0:
+                raise ValueError("TCP_COUNT 必须是非负整数")
             joint_ids = list(config["IDS"])
             if len(joint_ids) != joint_count:
-                raise ValueError("IDS 数量必须与 MAX_JOINT_COUNT 一致")
+                raise ValueError("IDS 数量必须与 JOINT_COUNT 一致")
             if any(type(value) is not int or not 0 <= value <= 252 for value in joint_ids):
                 raise ValueError("IDS 必须是 0 到 252 之间的整数")
             if len(set(joint_ids)) != len(joint_ids):
                 raise ValueError("IDS 不得重复")
-            self.MAX_JOINT_COUNT = joint_count
-            self.TCP_DIM = tcp_dim
+            self.JOINT_COUNT = joint_count
+            self.TCP_COUNT = tcp_count
             self.ids = joint_ids
         except (OSError, ValueError, KeyError, TypeError) as error:
             message = f"Gello 配置读取失败 ({self.CONFIG_PATH}): {error}"
@@ -91,7 +92,6 @@ class GelloArm(BaseMasterArm):
 
         self.dynamixel_driver = None
         self.is_connected = False
-        self.is_enabled = False
         Logger.instance().info(f"[{self.name}] disconnected")
         return True
 
@@ -105,9 +105,9 @@ class GelloArm(BaseMasterArm):
                 raise ValueError("Dynamixel driver returned no joint positions")
 
             values = [float(value) for value in pos]
-            if len(values) != self.MAX_JOINT_COUNT:
+            if len(values) != self.JOINT_COUNT:
                 raise ValueError(
-                    f"expected {self.MAX_JOINT_COUNT} joints, received {len(values)}"
+                    f"expected {self.JOINT_COUNT} joints, received {len(values)}"
                 )
             if not all(math.isfinite(value) for value in values):
                 raise ValueError("joint positions contain non-finite values")
