@@ -11,17 +11,45 @@ from src.log import Logger
 
 class MasterRobotThread(QObject):
     sig_connection_changed = Signal(bool)
+    sig_joint_positions = Signal(list)
 
     def __init__(self):
         super().__init__()
         self.device = None
         self.is_connect = False
         self.logger = Logger.instance()
+        self.read_timer = QTimer(self)
+        self.read_timer.timeout.connect(self.read_joint_pos)
 
-    @Slot(str, dict)
-    def connect_device(self, model: str, options: dict) -> None:
+
+    def start_timer_work(self, interval_ms: int) -> bool:
+        if interval_ms <= 0 or not self.is_connect:
+            return False
+        if self.read_timer.isActive():
+            self.read_timer.setInterval(interval_ms)
+        else:
+            self.read_timer.start(interval_ms)
+        return True
+
+
+    def stop_timer_work(self) -> None:
+        if self.read_timer.isActive():
+            self.read_timer.stop()
+
+    @Slot()
+    def read_joint_pos(self) -> None:
+        positions = self.Get_joint_positions()
+        if positions:
+            self.sig_joint_positions.emit(positions)
+        elif not self.is_connect:
+            self.stop_timer_work()
+            self.sig_connection_changed.emit(False)
+
+    @Slot(str, dict, int)
+    def connect_device(self, model: str, options: dict, interval_ms: int) -> None:
         if self.Connect(model, options):
             self.logger.info(f"主手已连接：{model}，端口 {options.get('port', '')}")
+            self.start_timer_work(interval_ms)
         else:
             self.logger.error(f"主手连接失败：{model}，端口 {options.get('port', '')}")
         self.sig_connection_changed.emit(self.is_connect)
@@ -55,6 +83,7 @@ class MasterRobotThread(QObject):
 
 
     def Disconnect(self) -> bool:
+        self.stop_timer_work()
         if self.device is None:
             return False
 

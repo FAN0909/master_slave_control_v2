@@ -1,7 +1,7 @@
 import json
 import math
 from pathlib import Path
-from PySide6.QtCore import QIODevice, QSaveFile, QSignalBlocker, Qt, Signal
+from PySide6.QtCore import QIODevice, QSaveFile, QSignalBlocker, Qt, Signal, Slot
 from PySide6.QtWidgets import QAbstractItemView, QDialog, QHeaderView, QInputDialog, QMessageBox, QTableWidgetItem
 
 from .settings_window import Ui_SettingsDialog
@@ -23,3 +23,12 @@ class SettingsDialog(QDialog):
 
     def init_ui(self):
         self.ui.buttonBox.rejected.connect(self.reject)
+
+    @Slot(list)
+    def update_master_joint_positions(self, positions: list) -> None:
+        if len(positions) != 7:
+            return
+        for index, position in enumerate(positions):
+            getattr(self.ui, f"lineEdit_master_joint{index}").setText(
+                f"{position:.2f}"
+            )

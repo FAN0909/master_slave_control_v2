@@ -25,7 +25,7 @@ Ui_MainWindow, _ = loadUiType(str(UI_PATH))
 
 
 class MainWindow(QMainWindow):
-    request_master_connect = Signal(str, dict)
+    request_master_connect = Signal(str, dict, int)
     request_master_disconnect = Signal()
 
     def __init__(self):
@@ -98,6 +98,9 @@ class MainWindow(QMainWindow):
         self.request_master_connect.connect(self.master_worker.connect_device)
         self.request_master_disconnect.connect(self.master_worker.disconnect_device)
         self.master_worker.sig_connection_changed.connect(self._on_master_connection_changed)
+        self.master_worker.sig_joint_positions.connect(
+            self.set_dialog.update_master_joint_positions
+        )
         self.master_thread.finished.connect(self.master_worker.disconnect_device)
         self.master_thread.finished.connect(self.master_worker.deleteLater)
         self.master_thread.start()
@@ -156,13 +159,20 @@ class MainWindow(QMainWindow):
         port = self.ui.comboBox_master_port.currentData()
         if not port:
             return
+        try:
+            interval_ms = int(self.ui.lineEdit_master_read_pos_rate.text().strip())
+            if not 0 < interval_ms <= 2_147_483_647:
+                raise ValueError
+        except ValueError:
+            self.logger.error("主手读取周期必须是正整数（毫秒）")
+            return
         button.setEnabled(False)
         self.ui.comboBox_master_port.setEnabled(False)
         self.ui.pushButton_refresh_master_port.setEnabled(False)
         self._set_connection_status(
             self.ui.label_master_status, "● Connecting...", "connecting"
         )
-        self.request_master_connect.emit("Gello", {"port": port})
+        self.request_master_connect.emit("Gello", {"port": port}, interval_ms)
 
     @Slot(bool)
     def _on_master_connection_changed(self, connected: bool):
