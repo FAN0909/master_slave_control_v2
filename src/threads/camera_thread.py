@@ -3,9 +3,11 @@
 import logging
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from src.devices.drivers_factory import create_camera
+from src.log import Logger
 
 
 class CameraThread(QObject):
+    sig_devices_refreshed = Signal(list)
 
     def __init__(self):
         super().__init__()
@@ -43,6 +45,7 @@ class CameraThread(QObject):
         self.is_connect = False
         return False
 
+    @Slot()
     def Disconnect(self) -> bool:
         if self.device is None:
             return False
@@ -63,6 +66,10 @@ class CameraThread(QObject):
     def _create_device(self, model: str, **options):
         return create_camera(model, **options)
 
+    @Slot(str, dict)
+    def refresh_devices(self, model: str, options: dict) -> None:
+        self.sig_devices_refreshed.emit(self.list_devices(model, options))
+
  
     def list_devices(self, model: str, options: dict) -> list:
         # 枚举不需要建立相机连接。
@@ -70,8 +77,8 @@ class CameraThread(QObject):
             device = self._create_device(model, **options)
             devices = device.list_devices()
             return devices
-        except Exception:
-            logging.exception("相机枚举失败：%s", model)
+        except Exception as error:
+            Logger.instance().error(f"刷新相机列表失败：{error}")
             return []
 
     def Get_color_frame(self):

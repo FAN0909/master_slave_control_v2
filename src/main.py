@@ -11,6 +11,7 @@ from serial.tools import list_ports
 
 if __package__:
     from .log import Logger
+    from .threads.camera_thread import CameraThread
     from .threads.hand_thread import HandThread
     from .threads.master_robot_thread import MasterRobotThread
     from .threads.slave_robot_thread import SlaveRobotThread
@@ -19,6 +20,7 @@ else:
     # 支持在 IDE 中直接运行 src/main.py。
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from src.log import Logger
+    from src.threads.camera_thread import CameraThread
     from src.threads.hand_thread import HandThread
     from src.threads.master_robot_thread import MasterRobotThread
     from src.threads.slave_robot_thread import SlaveRobotThread
@@ -38,6 +40,7 @@ class MainWindow(QMainWindow):
     request_slave_power_off = Signal()
     request_hand_connect = Signal(str, dict, int)
     request_hand_disconnect = Signal()
+    request_camera_refresh = Signal(str, dict)
 
     def __init__(self):
         super().__init__()
@@ -93,6 +96,9 @@ class MainWindow(QMainWindow):
             self._refresh_hand_comm_info
         )
         self.ui.pushButton_connect_hand.clicked.connect(self._toggle_hand_connection)
+
+        # camera 相关按钮
+        self.ui.pushButton_camera_refresh.clicked.connect(self._refresh_camera_devices)
 
     #打开设置界面
     def _open_settings(self) -> None:
@@ -166,7 +172,22 @@ class MainWindow(QMainWindow):
         self.hand_thread.start()
 
     def init_camera_thread(self):
-        pass
+        self.camera_threads = {}
+        self.camera_workers = {}
+        for camera in ("side", "front", "hand"):
+            thread = QThread(self)
+            worker = CameraThread()
+            worker.moveToThread(thread)
+            thread.finished.connect(worker.Disconnect)
+            thread.finished.connect(worker.deleteLater)
+            thread.start()
+            self.camera_threads[camera] = thread
+            self.camera_workers[camera] = worker
+        # 相机设备列表是全局的，查询一次后会同步更新 side、front、hand 三个下拉框。
+        self.request_camera_refresh.connect(self.camera_workers["side"].refresh_devices)
+        self.camera_workers["side"].sig_devices_refreshed.connect(
+            self._on_camera_devices_refreshed
+        )
 
 #endregion=================================初始化线程============================================
 
@@ -411,13 +432,46 @@ class MainWindow(QMainWindow):
 
 #endregion====================================hand相关================================================
 
+#region=====================================camera相关=================================================
+    @Slot()
+    def _refresh_camera_devices(self):
+        self.ui.pushButton_camera_refresh.setEnabled(False)
+        model = self.ui.comboBox_camera_model.currentText().removeprefix("RealSense")
+        self.request_camera_refresh.emit(model, {})
+
+    @Slot(list)
+    def _on_camera_devices_refreshed(self, devices: list):
+        for combo in (
+            self.ui.comboBox_camera_device_side,
+            self.ui.comboBox_camera_device_front,
+            self.ui.comboBox_camera_device_hand,
+        ):
+            selected_serial = combo.currentData()
+            combo.clear()
+            for name, serial in devices:
+                combo.addItem(f"{name} ({serial})", serial)
+            if devices:
+                index = combo.findData(selected_serial)
+                combo.setCurrentIndex(index if index >= 0 else 0)
+            else:
+                combo.addItem("无可用相机", None)
+        self.ui.pushButton_camera_refresh.setEnabled(True)
+
+
+
+#endregion=====================================camera相关=================================================
+
     def closeEvent(self, event):
         self.master_thread.quit()
         self.slave_thread.quit()
         self.hand_thread.quit()
+        for thread in self.camera_threads.values():
+            thread.quit()
         self.master_thread.wait()
         self.slave_thread.wait()
         self.hand_thread.wait()
+        for thread in self.camera_threads.values():
+            thread.wait()
         super().closeEvent(event)
 
     def _append_log(self, _level: str, text: str) -> None:
