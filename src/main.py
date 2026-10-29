@@ -1,6 +1,7 @@
 """应用入口：创建并显示主窗口。"""
 
 import sys
+from functools import partial
 from ipaddress import IPv4Address
 from pathlib import Path
 
@@ -41,6 +42,12 @@ class MainWindow(QMainWindow):
     request_hand_connect = Signal(str, dict, int)
     request_hand_disconnect = Signal()
     request_camera_refresh = Signal(str, dict)
+    request_camera_connect_side = Signal(str, dict)
+    request_camera_connect_front = Signal(str, dict)
+    request_camera_connect_hand = Signal(str, dict)
+    request_camera_disconnect_side = Signal()
+    request_camera_disconnect_front = Signal()
+    request_camera_disconnect_hand = Signal()
 
     def __init__(self):
         super().__init__()
@@ -52,6 +59,7 @@ class MainWindow(QMainWindow):
         self.slave_connected = False
         self.slave_enabled = False
         self.hand_connected = False
+        self.camera_connected = {camera: False for camera in ("side", "front", "hand")}
 
 
         self.init_ui()
@@ -99,6 +107,16 @@ class MainWindow(QMainWindow):
 
         # camera 相关按钮
         self.ui.pushButton_camera_refresh.clicked.connect(self._refresh_camera_devices)
+        self.camera_controls = {
+            "side": (self.ui.comboBox_camera_device_side,
+                     self.ui.pushButton_connect_side_camera, self.ui.label_camera_status_1),
+            "front": (self.ui.comboBox_camera_device_front,
+                      self.ui.pushButton_connect__front_camera, self.ui.label_camera_status_2),
+            "hand": (self.ui.comboBox_camera_device_hand,
+                     self.ui.pushButton_connect_camera_hand, self.ui.label_camera_status_3),
+        }
+        for camera, (_, button, _) in self.camera_controls.items():
+            button.clicked.connect(partial(self._toggle_camera_connection, camera))
 
     #打开设置界面
     def _open_settings(self) -> None:
@@ -183,6 +201,11 @@ class MainWindow(QMainWindow):
             thread.start()
             self.camera_threads[camera] = thread
             self.camera_workers[camera] = worker
+            getattr(self, f"request_camera_connect_{camera}").connect(worker.connect_device)
+            getattr(self, f"request_camera_disconnect_{camera}").connect(worker.disconnect_device)
+            worker.sig_connection_changed.connect(
+                partial(self._on_camera_connection_changed, camera)
+            )
         # 相机设备列表是全局的，查询一次后会同步更新 side、front、hand 三个下拉框。
         self.request_camera_refresh.connect(self.camera_workers["side"].refresh_devices)
         self.camera_workers["side"].sig_devices_refreshed.connect(
@@ -441,11 +464,9 @@ class MainWindow(QMainWindow):
 
     @Slot(list)
     def _on_camera_devices_refreshed(self, devices: list):
-        for combo in (
-            self.ui.comboBox_camera_device_side,
-            self.ui.comboBox_camera_device_front,
-            self.ui.comboBox_camera_device_hand,
-        ):
+        for camera, (combo, _, _) in self.camera_controls.items():
+            if not combo.isEnabled():
+                continue
             selected_serial = combo.currentData()
             combo.clear()
             for name, serial in devices:
@@ -456,6 +477,38 @@ class MainWindow(QMainWindow):
             else:
                 combo.addItem("无可用相机", None)
         self.ui.pushButton_camera_refresh.setEnabled(True)
+
+    def _toggle_camera_connection(self, camera: str, _checked: bool = False) -> None:
+        combo, button, label = self.camera_controls[camera]
+        if self.camera_connected[camera]:
+            button.setEnabled(False)
+            self._set_connection_status(label, "● Disconnecting...", "disconnecting")
+            getattr(self, f"request_camera_disconnect_{camera}").emit()
+            return
+
+        serial = combo.currentData()
+        if serial is None:
+            self.logger.error("请先刷新并选择相机设备")
+            return
+        model = self.ui.comboBox_camera_model.currentText().removeprefix("RealSense")
+        button.setEnabled(False)
+        combo.setEnabled(False)
+        self._set_connection_status(label, "● Connecting...", "connecting")
+        getattr(self, f"request_camera_connect_{camera}").emit(
+            model, {"serial_number": serial}
+        )
+
+    def _on_camera_connection_changed(self, camera: str, connected: bool) -> None:
+        self.camera_connected[camera] = connected
+        combo, button, label = self.camera_controls[camera]
+        self._set_connection_status(
+            label,
+            "● Connected" if connected else "● Disconnected",
+            "connected" if connected else "disconnected",
+        )
+        button.setText("Disconnect" if connected else "Connect")
+        button.setEnabled(True)
+        combo.setEnabled(not connected)
 
 
 

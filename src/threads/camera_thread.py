@@ -8,21 +8,34 @@ from src.log import Logger
 
 class CameraThread(QObject):
     sig_devices_refreshed = Signal(list)
+    sig_connection_changed = Signal(bool)
 
     def __init__(self):
         super().__init__()
         self.device = None
         self.is_connect = False
 
+    @Slot(str, dict)
+    def connect_device(self, model: str, options: dict) -> None:
+        if self.Connect(model, options):
+            Logger.instance().info(f"相机已连接：{options['serial_number']}")
+        self.sig_connection_changed.emit(self.is_connect)
+
+    @Slot()
+    def disconnect_device(self) -> None:
+        if self.Disconnect():
+            Logger.instance().info("相机已断开")
+        self.sig_connection_changed.emit(self.is_connect)
+
 
     def Connect(self, model: str, options: dict) -> bool:
         if self.device is not None:
             try:
                 if not self.device.Disconnect():
-                    logging.error("已有相机断开失败，无法连接新设备")
+                    Logger.instance().error("已有相机断开失败，无法连接新设备")
                     return False
-            except Exception:
-                logging.exception("已有相机断开失败，无法连接新设备")
+            except Exception as error:
+                Logger.instance().error(f"已有相机断开失败，无法连接新设备：{error}")
                 return False
             self.device = None
 
@@ -31,9 +44,9 @@ class CameraThread(QObject):
             if self.device.Connect():
                 self.is_connect = True
                 return True
-        except Exception:
+        except Exception as error:
             self.is_connect = False
-            logging.exception("相机连接失败：%s", model)
+            Logger.instance().error(f"相机连接失败：{error}")
 
         # 连接失败时释放驱动可能已经占用的资源。
         if self.device is not None:
@@ -52,10 +65,10 @@ class CameraThread(QObject):
 
         try:
             if not self.device.Disconnect():
-                logging.error("相机断开失败")
+                Logger.instance().error("相机断开失败")
                 return False
-        except Exception:
-            logging.exception("相机断开失败")
+        except Exception as error:
+            Logger.instance().error(f"相机断开失败：{error}")
             return False
 
         self.device = None
