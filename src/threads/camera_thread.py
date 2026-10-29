@@ -12,7 +12,7 @@ class CameraThread(QObject):
         self.device = None
         self.is_connect = False
 
-    @Slot(str, dict)
+
     def Connect(self, model: str, options: dict) -> bool:
         if self.device is not None:
             try:
@@ -43,7 +43,6 @@ class CameraThread(QObject):
         self.is_connect = False
         return False
 
-    @Slot()
     def Disconnect(self) -> bool:
         if self.device is None:
             return False
@@ -64,7 +63,7 @@ class CameraThread(QObject):
     def _create_device(self, model: str, **options):
         return create_camera(model, **options)
 
-    @Slot(str, dict)
+ 
     def list_devices(self, model: str, options: dict) -> list:
         # 枚举不需要建立相机连接。
         try:
