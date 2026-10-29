@@ -11,6 +11,7 @@ from src.log import Logger
 
 class SlaveRobotThread(QObject):
     sig_connection_changed = Signal(bool)
+    sig_power_changed = Signal(bool)
 
     def __init__(self):
         super().__init__()
@@ -32,6 +33,22 @@ class SlaveRobotThread(QObject):
             else:
                 Logger.instance().error("从手断开失败")
         self.sig_connection_changed.emit(self.is_connect)
+
+    @Slot()
+    def power_on(self) -> None:
+        if self.Enable():
+            Logger.instance().info("从手已上电")
+        else:
+            Logger.instance().error("从手上电失败")
+        self.sig_power_changed.emit(self.is_enable)
+
+    @Slot()
+    def power_off(self) -> None:
+        if self.Disable():
+            Logger.instance().info("从手已下电")
+        else:
+            Logger.instance().error("从手下电失败")
+        self.sig_power_changed.emit(self.is_enable)
 
     @Slot(str, dict)
     def Connect(self, model: str, options: dict) -> bool:
@@ -69,6 +86,7 @@ class SlaveRobotThread(QObject):
 
         self.device = None
         self.is_connect = False
+        self.is_enable = False
         return True
 
     def _create_device(self, model: str, **options):

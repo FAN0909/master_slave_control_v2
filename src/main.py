@@ -32,6 +32,8 @@ class MainWindow(QMainWindow):
     request_master_disconnect = Signal()
     request_slave_connect = Signal(str, dict)
     request_slave_disconnect = Signal()
+    request_slave_power_on = Signal()
+    request_slave_power_off = Signal()
 
     def __init__(self):
         super().__init__()
@@ -41,6 +43,7 @@ class MainWindow(QMainWindow):
         #初始化变量
         self.master_connected = False
         self.slave_connected = False
+        self.slave_enabled = False
 
 
         self.init_ui()
@@ -76,6 +79,7 @@ class MainWindow(QMainWindow):
 
         # slave 相关按钮
         self.ui.Btn_robot_connect.clicked.connect(self._toggle_slave_connection)
+        self.ui.pushButton_robot_PowerOn.clicked.connect(self._toggle_slave_power)
 
     #打开设置界面
     def _open_settings(self) -> None:
@@ -120,7 +124,10 @@ class MainWindow(QMainWindow):
         self.slave_worker.moveToThread(self.slave_thread)
         self.request_slave_connect.connect(self.slave_worker.connect_device)
         self.request_slave_disconnect.connect(self.slave_worker.disconnect_device)
+        self.request_slave_power_on.connect(self.slave_worker.power_on)
+        self.request_slave_power_off.connect(self.slave_worker.power_off)
         self.slave_worker.sig_connection_changed.connect(self._on_slave_connection_changed)
+        self.slave_worker.sig_power_changed.connect(self._on_slave_power_changed)
         self.slave_thread.finished.connect(self.slave_worker.disconnect_device)
         self.slave_thread.finished.connect(self.slave_worker.deleteLater)
         self.slave_thread.start()
@@ -243,6 +250,10 @@ class MainWindow(QMainWindow):
     @Slot(bool)
     def _on_slave_connection_changed(self, connected: bool):
         self.slave_connected = connected
+        if not connected:
+            self.slave_enabled = False
+            self.ui.pushButton_robot_PowerOn.setText("PowerOn")
+        self.ui.pushButton_robot_PowerOn.setEnabled(connected)
         self._set_connection_status(
             self.ui.label_slave_status,
             "● Connected" if connected else "● Disconnected",
@@ -252,6 +263,22 @@ class MainWindow(QMainWindow):
         self.ui.Btn_robot_connect.setEnabled(True)
         self.ui.comboBox_robot_type.setEnabled(not connected)
         self.ui.lineEdit_slave_arm_ip.setEnabled(not connected)
+
+    @Slot()
+    def _toggle_slave_power(self):
+        if not self.slave_connected:
+            return
+        self.ui.pushButton_robot_PowerOn.setEnabled(False)
+        if self.slave_enabled:
+            self.request_slave_power_off.emit()
+        else:
+            self.request_slave_power_on.emit()
+
+    @Slot(bool)
+    def _on_slave_power_changed(self, enabled: bool):
+        self.slave_enabled = enabled
+        self.ui.pushButton_robot_PowerOn.setText("PowerOff" if enabled else "PowerOn")
+        self.ui.pushButton_robot_PowerOn.setEnabled(self.slave_connected)
 
 #endregion====================================slave相关=============================================
 
