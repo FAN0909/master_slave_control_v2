@@ -22,8 +22,6 @@ class SlaveRobotThread(QObject):
     def connect_device(self, model: str, options: dict) -> None:
         if self.Connect(model, options):
             Logger.instance().info(f"从手已连接：{model}，IP {options.get('ip_address', '')}")
-        else:
-            Logger.instance().error(f"从手连接失败：{model}，IP {options.get('ip_address', '')}")
         self.sig_connection_changed.emit(self.is_connect)
 
     @Slot()
@@ -38,6 +36,7 @@ class SlaveRobotThread(QObject):
     @Slot(str, dict)
     def Connect(self, model: str, options: dict) -> bool:
         if self.device is not None and not self.Disconnect():
+            Logger.instance().error("从手连接失败：现有设备断开失败")
             return False
 
         try:
@@ -45,8 +44,10 @@ class SlaveRobotThread(QObject):
             if self.device.Connect():
                 self.is_connect = True
                 return True
-        except Exception:
-            logging.exception("从手连接失败：%s", model)
+        except Exception as error:
+            Logger.instance().error(f"从手连接失败：{error}")
+        else:
+            Logger.instance().error(f"从手连接失败：{model}，IP {options.get('ip_address', '')}")
 
         if self.device is not None:
             self.Disconnect()
