@@ -6,16 +6,34 @@ import math
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 from src.devices.drivers_factory import create_slave_arm
+from src.log import Logger
 
 
 class SlaveRobotThread(QObject):
-
+    sig_connection_changed = Signal(bool)
 
     def __init__(self):
         super().__init__()
         self.device = None
         self.is_connect = False
         self.is_enable = False
+
+    @Slot(str, dict)
+    def connect_device(self, model: str, options: dict) -> None:
+        if self.Connect(model, options):
+            Logger.instance().info(f"从手已连接：{model}，IP {options.get('ip_address', '')}")
+        else:
+            Logger.instance().error(f"从手连接失败：{model}，IP {options.get('ip_address', '')}")
+        self.sig_connection_changed.emit(self.is_connect)
+
+    @Slot()
+    def disconnect_device(self) -> None:
+        if self.device is not None:
+            if self.Disconnect():
+                Logger.instance().info("从手已断开")
+            else:
+                Logger.instance().error("从手断开失败")
+        self.sig_connection_changed.emit(self.is_connect)
 
     @Slot(str, dict)
     def Connect(self, model: str, options: dict) -> bool:
@@ -30,6 +48,9 @@ class SlaveRobotThread(QObject):
         except Exception:
             logging.exception("从手连接失败：%s", model)
 
+        if self.device is not None:
+            self.Disconnect()
+        self.is_connect = False
         return False
 
     @Slot()

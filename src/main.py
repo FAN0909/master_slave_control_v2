@@ -1,6 +1,7 @@
 """应用入口：创建并显示主窗口。"""
 
 import sys
+from ipaddress import IPv4Address
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal, Slot
@@ -11,12 +12,14 @@ from serial.tools import list_ports
 if __package__:
     from .log import Logger
     from .threads.master_robot_thread import MasterRobotThread
+    from .threads.slave_robot_thread import SlaveRobotThread
     from .ui.settings_dialog import SettingsDialog
 else:
     # 支持在 IDE 中直接运行 src/main.py。
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from src.log import Logger
     from src.threads.master_robot_thread import MasterRobotThread
+    from src.threads.slave_robot_thread import SlaveRobotThread
     from src.ui.settings_dialog import SettingsDialog
 
 
@@ -27,6 +30,8 @@ Ui_MainWindow, _ = loadUiType(str(UI_PATH))
 class MainWindow(QMainWindow):
     request_master_connect = Signal(str, dict, int)
     request_master_disconnect = Signal()
+    request_slave_connect = Signal(str, dict)
+    request_slave_disconnect = Signal()
 
     def __init__(self):
         super().__init__()
@@ -35,6 +40,7 @@ class MainWindow(QMainWindow):
 
         #初始化变量
         self.master_connected = False
+        self.slave_connected = False
 
 
         self.init_ui()
@@ -67,6 +73,9 @@ class MainWindow(QMainWindow):
         #master相关按钮
         self.ui.pushButton_refresh_master_port.clicked.connect(self._refresh_master_ports)
         self.ui.pushButton_connect_master_arm.clicked.connect(self._toggle_master_connection)
+
+        # slave 相关按钮
+        self.ui.Btn_robot_connect.clicked.connect(self._toggle_slave_connection)
 
     #打开设置界面
     def _open_settings(self) -> None:
@@ -106,7 +115,15 @@ class MainWindow(QMainWindow):
         self.master_thread.start()
 
     def init_slave_thread(self):
-        pass
+        self.slave_thread = QThread(self)
+        self.slave_worker = SlaveRobotThread()
+        self.slave_worker.moveToThread(self.slave_thread)
+        self.request_slave_connect.connect(self.slave_worker.connect_device)
+        self.request_slave_disconnect.connect(self.slave_worker.disconnect_device)
+        self.slave_worker.sig_connection_changed.connect(self._on_slave_connection_changed)
+        self.slave_thread.finished.connect(self.slave_worker.disconnect_device)
+        self.slave_thread.finished.connect(self.slave_worker.deleteLater)
+        self.slave_thread.start()
 
     def init_hand_thread(self):
         pass
@@ -193,9 +210,56 @@ class MainWindow(QMainWindow):
 
 #endregion=================================master相关===========================================
 
+
+#region====================================slave相关=============================================
+    @Slot()
+    def _toggle_slave_connection(self):
+        button = self.ui.Btn_robot_connect
+        button.setEnabled(False)
+        self.ui.comboBox_robot_type.setEnabled(False)
+        self.ui.lineEdit_slave_arm_ip.setEnabled(False)
+
+        if self.slave_connected:
+            self._set_connection_status(
+                self.ui.label_slave_status, "● Disconnecting...", "disconnecting"
+            )
+            self.request_slave_disconnect.emit()
+            return
+
+        model = self.ui.comboBox_robot_type.currentText()
+        ip = self.ui.lineEdit_slave_arm_ip.text().strip()
+        try:
+            IPv4Address(ip)
+        except ValueError:
+            self.logger.error("从手 IP 地址无效")
+            self._on_slave_connection_changed(False)
+            return
+
+        self._set_connection_status(
+            self.ui.label_slave_status, "● Connecting...", "connecting"
+        )
+        self.request_slave_connect.emit(model, {"ip_address": ip})
+
+    @Slot(bool)
+    def _on_slave_connection_changed(self, connected: bool):
+        self.slave_connected = connected
+        self._set_connection_status(
+            self.ui.label_slave_status,
+            "● Connected" if connected else "● Disconnected",
+            "connected" if connected else "disconnected",
+        )
+        self.ui.Btn_robot_connect.setText("Disconnect" if connected else "Connect")
+        self.ui.Btn_robot_connect.setEnabled(True)
+        self.ui.comboBox_robot_type.setEnabled(not connected)
+        self.ui.lineEdit_slave_arm_ip.setEnabled(not connected)
+
+#endregion====================================slave相关=============================================
+
     def closeEvent(self, event):
         self.master_thread.quit()
+        self.slave_thread.quit()
         self.master_thread.wait()
+        self.slave_thread.wait()
         super().closeEvent(event)
 
     def _append_log(self, _level: str, text: str) -> None:
