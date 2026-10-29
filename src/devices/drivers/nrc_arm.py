@@ -303,12 +303,13 @@ class NrcArm(BaseRobotArm):
             Logger.instance().error(f"[{self.name}] close_servoJ error: {e}")
             return False
 
+    #目标关节角（度），长度必须 ≥ 7；是目标绝对位置，不是增量
     def Set_servoJ_pos(self, target_positions: list) -> bool:
         if self.servo_fd is None or self.servo_fd == -1:
             Logger.instance().error(f"[{self.name}] set_servoJ_pos failed: invalid servo_fd")
             return False
 
-        if len(target_positions) < self.JOINT_COUNT-1:
+        if len(target_positions) < self.JOINT_COUNT:
             Logger.instance().error(f"[{self.name}] 目标关节数量不匹配")
             return False
 
