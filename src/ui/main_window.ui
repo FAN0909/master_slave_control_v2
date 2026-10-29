@@ -460,11 +460,11 @@
              </item>
              <item row="1" column="1" colspan="4">
               <widget class="QLineEdit" name="lineEdit_task">
-               <property name="placeholderText">
-                <string>例如：将红色方块放入盒子</string>
-               </property>
                <property name="toolTip">
                 <string>每条 episode 使用开始采集时填写的任务描述；保存或丢弃后可修改。</string>
+               </property>
+               <property name="placeholderText">
+                <string>例如：将红色方块放入盒子</string>
                </property>
               </widget>
              </item>
@@ -568,26 +568,6 @@
            </property>
            <property name="text">
             <string>Refresh Devices List</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="pushButton_camera_connect_all">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Connect All</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="pushButton_camera_disconnect_all">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="text">
-            <string>Disconnect All</string>
            </property>
           </widget>
          </item>
@@ -859,7 +839,7 @@
      <x>0</x>
      <y>0</y>
      <width>1349</width>
-     <height>27</height>
+     <height>22</height>
     </rect>
    </property>
    <addaction name="menuSet_Param"/>
