@@ -9,16 +9,39 @@ from src.log import Logger
 class CameraThread(QObject):
     sig_devices_refreshed = Signal(list)
     sig_connection_changed = Signal(bool)
+    sig_color_frame = Signal(object)
 
     def __init__(self):
         super().__init__()
         self.device = None
         self.is_connect = False
+        self.read_timer = QTimer(self)
+        self.read_timer.timeout.connect(self.read_color_frame)
 
-    @Slot(str, dict)
-    def connect_device(self, model: str, options: dict) -> None:
+    def start_timer_work(self, interval_ms: int) -> bool:
+        if interval_ms <= 0 or not self.is_connect:
+            return False
+        self.read_timer.start(interval_ms)
+        return True
+
+    def stop_timer_work(self) -> None:
+        if self.read_timer.isActive():
+            self.read_timer.stop()
+
+    @Slot()
+    def read_color_frame(self) -> None:
+        frame = self.Get_color_frame()
+        if frame is not None:
+            self.sig_color_frame.emit(frame)
+        elif not self.is_connect:
+            self.stop_timer_work()
+            self.sig_connection_changed.emit(False)
+
+    @Slot(str, dict, int)
+    def connect_device(self, model: str, options: dict, interval_ms: int) -> None:
         if self.Connect(model, options):
             Logger.instance().info(f"相机已连接：{options['serial_number']}")
+            self.start_timer_work(interval_ms)
         self.sig_connection_changed.emit(self.is_connect)
 
     @Slot()
@@ -61,6 +84,7 @@ class CameraThread(QObject):
     @Slot()
     def Disconnect(self) -> bool:
         if self.device is None:
+            self.stop_timer_work()
             return False
 
         try:
@@ -71,6 +95,7 @@ class CameraThread(QObject):
             Logger.instance().error(f"相机断开失败：{error}")
             return False
 
+        self.stop_timer_work()
         self.device = None
         self.is_connect = False
         return True
@@ -101,8 +126,8 @@ class CameraThread(QObject):
 
         try:
             frame = self.device.Get_color_frame()
-        except Exception:
-            logging.exception("相机读取彩色帧失败")
-            self.is_connect = False
+        except Exception as error:
+            Logger.instance().error(f"相机读取彩色帧失败：{error}")
+            self.is_connect = bool(self.device.is_connected)
             return None
         return frame

@@ -5,7 +5,8 @@ from functools import partial
 from ipaddress import IPv4Address
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal, Slot
+from PySide6.QtCore import Qt, QThread, Signal, Slot
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtUiTools import loadUiType
 from PySide6.QtWidgets import QApplication, QLabel, QMainWindow
 from serial.tools import list_ports
@@ -42,9 +43,9 @@ class MainWindow(QMainWindow):
     request_hand_connect = Signal(str, dict, int)
     request_hand_disconnect = Signal()
     request_camera_refresh = Signal(str, dict)
-    request_camera_connect_side = Signal(str, dict)
-    request_camera_connect_front = Signal(str, dict)
-    request_camera_connect_hand = Signal(str, dict)
+    request_camera_connect_side = Signal(str, dict, int)
+    request_camera_connect_front = Signal(str, dict, int)
+    request_camera_connect_hand = Signal(str, dict, int)
     request_camera_disconnect_side = Signal()
     request_camera_disconnect_front = Signal()
     request_camera_disconnect_hand = Signal()
@@ -114,6 +115,11 @@ class MainWindow(QMainWindow):
                       self.ui.pushButton_connect__front_camera, self.ui.label_camera_status_2),
             "hand": (self.ui.comboBox_camera_device_hand,
                      self.ui.pushButton_connect_camera_hand, self.ui.label_camera_status_3),
+        }
+        self.camera_previews = {
+            "side": self.ui.label_camera_preview_1,
+            "front": self.ui.label_camera_preview_2,
+            "hand": self.ui.label_camera_preview_3,
         }
         for camera, (_, button, _) in self.camera_controls.items():
             button.clicked.connect(partial(self._toggle_camera_connection, camera))
@@ -206,6 +212,7 @@ class MainWindow(QMainWindow):
             worker.sig_connection_changed.connect(
                 partial(self._on_camera_connection_changed, camera)
             )
+            worker.sig_color_frame.connect(partial(self._on_camera_frame, camera))
         # 相机设备列表是全局的，查询一次后会同步更新 side、front、hand 三个下拉框。
         self.request_camera_refresh.connect(self.camera_workers["side"].refresh_devices)
         self.camera_workers["side"].sig_devices_refreshed.connect(
@@ -490,12 +497,19 @@ class MainWindow(QMainWindow):
         if serial is None:
             self.logger.error("请先刷新并选择相机设备")
             return
+        try:
+            interval_ms = int(self.ui.lineEdit_camera_frame_interval.text().strip())
+            if not 0 < interval_ms <= 2_147_483_647:
+                raise ValueError
+        except ValueError:
+            self.logger.error("相机读取周期必须是正整数（毫秒）")
+            return
         model = self.ui.comboBox_camera_model.currentText().removeprefix("RealSense")
         button.setEnabled(False)
         combo.setEnabled(False)
         self._set_connection_status(label, "● Connecting...", "connecting")
         getattr(self, f"request_camera_connect_{camera}").emit(
-            model, {"serial_number": serial}
+            model, {"serial_number": serial}, interval_ms
         )
 
     def _on_camera_connection_changed(self, camera: str, connected: bool) -> None:
@@ -509,6 +523,20 @@ class MainWindow(QMainWindow):
         button.setText("Disconnect" if connected else "Connect")
         button.setEnabled(True)
         combo.setEnabled(not connected)
+        if not connected:
+            self.camera_previews[camera].clear()
+
+    def _on_camera_frame(self, camera: str, frame) -> None:
+        if not self.camera_connected[camera]:
+            return
+        label = self.camera_previews[camera]
+        height, width = frame.shape[:2]
+        image = QImage(frame.data, width, height, frame.strides[0], QImage.Format_BGR888)
+        label.setPixmap(
+            QPixmap.fromImage(image).scaled(
+                label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        )
 
 
 
