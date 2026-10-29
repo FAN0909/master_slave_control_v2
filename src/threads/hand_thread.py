@@ -42,6 +42,7 @@ class HandThread(QObject):
         return False
 
 
+    @Slot()
     def Disconnect(self) -> bool:
         if self.device is None:
             return False

@@ -11,6 +11,7 @@ from serial.tools import list_ports
 
 if __package__:
     from .log import Logger
+    from .threads.hand_thread import HandThread
     from .threads.master_robot_thread import MasterRobotThread
     from .threads.slave_robot_thread import SlaveRobotThread
     from .ui.settings_dialog import SettingsDialog
@@ -18,6 +19,7 @@ else:
     # 支持在 IDE 中直接运行 src/main.py。
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from src.log import Logger
+    from src.threads.hand_thread import HandThread
     from src.threads.master_robot_thread import MasterRobotThread
     from src.threads.slave_robot_thread import SlaveRobotThread
     from src.ui.settings_dialog import SettingsDialog
@@ -140,7 +142,12 @@ class MainWindow(QMainWindow):
         self.slave_thread.start()
 
     def init_hand_thread(self):
-        pass
+        self.hand_thread = QThread(self)
+        self.hand_worker = HandThread()
+        self.hand_worker.moveToThread(self.hand_thread)
+        self.hand_thread.finished.connect(self.hand_worker.Disconnect)
+        self.hand_thread.finished.connect(self.hand_worker.deleteLater)
+        self.hand_thread.start()
 
     def init_camera_thread(self):
         pass
@@ -224,7 +231,6 @@ class MainWindow(QMainWindow):
 
 #endregion=================================master相关===========================================
 
-
 #region====================================slave相关=============================================
     @Slot()
     def _toggle_slave_connection(self):
@@ -297,11 +303,18 @@ class MainWindow(QMainWindow):
 
 #endregion====================================slave相关=============================================
 
+#region====================================hand相关================================================
+
+
+#endregion====================================hand相关================================================
+
     def closeEvent(self, event):
         self.master_thread.quit()
         self.slave_thread.quit()
+        self.hand_thread.quit()
         self.master_thread.wait()
         self.slave_thread.wait()
+        self.hand_thread.wait()
         super().closeEvent(event)
 
     def _append_log(self, _level: str, text: str) -> None:
