@@ -248,14 +248,17 @@ class SettingsDialog(QDialog):
         try:
             with self.HAND_CONFIG_PATH.open("r", encoding="utf-8") as config_file:
                 config = json.load(config_file)[self.hand_model]
+            joint_count = config["joint_count"]
             try:
-                positions = [round(float(getattr(self.ui, f"lineEdit_hand_joint{index}").text()))
-                             for index in range(6)]
+                positions = [
+                    round(float(getattr(self.ui, f"lineEdit_hand_joint{index}").text()))
+                    for index in range(joint_count)
+                ]
                 limits = config["position_range"]
                 if not all(limits["min"] <= value <= limits["max"] for value in positions):
                     raise ValueError("当前关节位置超出范围")
-            except (ValueError, TypeError):
-                positions = [config["position_range"]["min"]] * 6
+            except (AttributeError, OverflowError, ValueError, TypeError):
+                positions = [config["position_range"]["min"]] * joint_count
             values = [name, "", *positions, config["default_speed"], config["default_force"]]
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
             Logger.instance().error(f"新增灵巧手动作失败：{error}")
@@ -287,6 +290,7 @@ class SettingsDialog(QDialog):
             raise ValueError("至少需要保留一个动作")
         with self.HAND_CONFIG_PATH.open("r", encoding="utf-8") as config_file:
             model_config = json.load(config_file)[self.hand_model]
+        joint_count = model_config["joint_count"]
         position_range = model_config["position_range"]
         actions = {}
         for row in range(table.rowCount()):
@@ -298,10 +302,11 @@ class SettingsDialog(QDialog):
             if not name or name in actions:
                 raise ValueError(f"第 {row + 1} 行动作名称为空或重复")
             try:
-                values = [int(cell(column)) for column in range(2, 10)]
+                values = [int(cell(column)) for column in range(2, joint_count + 4)]
             except ValueError as error:
                 raise ValueError(f"动作 {name} 的关节值、速度和力度必须是整数") from error
-            positions, speed, force = values[:6], values[6], values[7]
+            positions = values[:joint_count]
+            speed, force = values[joint_count:]
             if not all(position_range["min"] <= value <= position_range["max"]
                        for value in positions):
                 raise ValueError(f"动作 {name} 的关节值超出范围")
