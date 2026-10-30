@@ -64,6 +64,9 @@ class SettingsDialog(QDialog):
 #region===================================slave配置文件的读写=======================================
     def update_slave_config(self, model: str) -> bool:
         self.slave_model = model
+        if self.slave_model is None:
+            return
+        
         try:
             with self.CONFIG_PATH.open("r", encoding="utf-8") as config_file:
                 model_config = json.load(config_file)[model]
@@ -129,3 +132,11 @@ class SettingsDialog(QDialog):
         return True
 
 #endregion===================================slave配置文件的读写=======================================
+
+#region===================================hand配置文件的读写========================================
+    def update_hand_config(self, model: str) -> bool:
+
+    
+
+
+#endregion================================hand配置文件的读写======================================

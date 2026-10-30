@@ -59,7 +59,9 @@ class MainWindow(QMainWindow):
         self.master_connected = False
         self.slave_connected = False
         self.slave_enabled = False
+        #记录当前连接的设备型号
         self.slave_model = None
+        self.hand_model = None
         self.hand_connected = False
         self.camera_connected = {camera: False for camera in ("side", "front", "hand")}
 
@@ -343,6 +345,7 @@ class MainWindow(QMainWindow):
         if connected and self.slave_model:
             self.set_dialog.update_slave_config(self.slave_model)
         if not connected:
+            self.set_dialog.update_slave_config(None) #断开连接后更新设置界面
             self.slave_enabled = False
             self.ui.pushButton_robot_PowerOn.setText("PowerOn")
         self.ui.pushButton_robot_PowerOn.setEnabled(connected)
@@ -449,6 +452,7 @@ class MainWindow(QMainWindow):
         self._set_connection_status(
             self.ui.label_hand_status, "● Connecting...", "connecting"
         )
+        self.hand_model = model
         self.request_hand_connect.emit(model, options, interval_ms)
 
     @Slot(bool)
@@ -463,6 +467,11 @@ class MainWindow(QMainWindow):
             "Disconnect" if connected else "Connect"
         )
         self.ui.pushButton_connect_hand.setEnabled(True)
+        if connected and self.hand_model:
+            self.set_dialog.update_hand_config(self.hand_model)
+        if not connected:
+            self.set_dialog.update_hand_config(None)
+
 
 #endregion====================================hand相关================================================
 
