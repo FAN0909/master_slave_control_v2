@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'main_window.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.11.2
+## Created by: Qt User Interface Compiler version 6.12.0
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -26,7 +26,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(1349, 882)
+        MainWindow.resize(1349, 1065)
         self.menuSet_Param = QAction(MainWindow)
         self.menuSet_Param.setObjectName(u"menuSet_Param")
         self.centralwidget = QWidget(MainWindow)
@@ -161,6 +161,12 @@ class Ui_MainWindow(object):
 
         self.gridLayout_5.addWidget(self.pushButton_connect_hand, 1, 4, 1, 1)
 
+        self.label_hand_status = QLabel(self.groupBox_hand_control)
+        self.label_hand_status.setObjectName(u"label_hand_status")
+        self.label_hand_status.setMinimumSize(QSize(78, 0))
+
+        self.gridLayout_5.addWidget(self.label_hand_status, 1, 5, 1, 1)
+
         self.label_34 = QLabel(self.groupBox_hand_control)
         self.label_34.setObjectName(u"label_34")
 
@@ -199,6 +205,22 @@ class Ui_MainWindow(object):
         self.pushButton_refresh_hand_connect_info.setObjectName(u"pushButton_refresh_hand_connect_info")
 
         self.gridLayout_5.addWidget(self.pushButton_refresh_hand_connect_info, 0, 4, 1, 1)
+
+        self.horizontalLayout_hand_read_rate = QHBoxLayout()
+        self.horizontalLayout_hand_read_rate.setObjectName(u"horizontalLayout_hand_read_rate")
+        self.label_hand_read_rate = QLabel(self.groupBox_hand_control)
+        self.label_hand_read_rate.setObjectName(u"label_hand_read_rate")
+
+        self.horizontalLayout_hand_read_rate.addWidget(self.label_hand_read_rate)
+
+        self.lineEdit_hand_read_pos_rate = QLineEdit(self.groupBox_hand_control)
+        self.lineEdit_hand_read_pos_rate.setObjectName(u"lineEdit_hand_read_pos_rate")
+        self.lineEdit_hand_read_pos_rate.setMaximumSize(QSize(65, 16777215))
+
+        self.horizontalLayout_hand_read_rate.addWidget(self.lineEdit_hand_read_pos_rate)
+
+
+        self.gridLayout_5.addLayout(self.horizontalLayout_hand_read_rate, 0, 5, 1, 1)
 
         self.label_33 = QLabel(self.groupBox_hand_control)
         self.label_33.setObjectName(u"label_33")
@@ -379,18 +401,6 @@ class Ui_MainWindow(object):
         self.pushButton_camera_refresh.setEnabled(True)
 
         self.horizontalLayout_camera_toolbar.addWidget(self.pushButton_camera_refresh)
-
-        self.pushButton_camera_connect_all = QPushButton(self.groupBox_camera_monitor)
-        self.pushButton_camera_connect_all.setObjectName(u"pushButton_camera_connect_all")
-        self.pushButton_camera_connect_all.setEnabled(True)
-
-        self.horizontalLayout_camera_toolbar.addWidget(self.pushButton_camera_connect_all)
-
-        self.pushButton_camera_disconnect_all = QPushButton(self.groupBox_camera_monitor)
-        self.pushButton_camera_disconnect_all.setObjectName(u"pushButton_camera_disconnect_all")
-        self.pushButton_camera_disconnect_all.setEnabled(True)
-
-        self.horizontalLayout_camera_toolbar.addWidget(self.pushButton_camera_disconnect_all)
 
 
         self.verticalLayout_camera_monitor.addLayout(self.horizontalLayout_camera_toolbar)
@@ -576,7 +586,7 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 1349, 27))
+        self.menubar.setGeometry(QRect(0, 0, 1349, 22))
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QStatusBar(MainWindow)
         self.statusbar.setObjectName(u"statusbar")
@@ -617,8 +627,9 @@ class Ui_MainWindow(object):
         self.label_slave_status.setText(QCoreApplication.translate("MainWindow", u"\u25cf Disconnected", None))
         self.groupBox_hand_control.setTitle(QCoreApplication.translate("MainWindow", u"Dexterous Hand Control", None))
         self.pushButton_connect_hand.setText(QCoreApplication.translate("MainWindow", u"Connect", None))
+        self.label_hand_status.setText(QCoreApplication.translate("MainWindow", u"\u25cf Disconnected", None))
         self.label_34.setText(QCoreApplication.translate("MainWindow", u"Type", None))
-        self.comboBox_hand_comm_type.setItemText(0, QCoreApplication.translate("MainWindow", u"Modebus", None))
+        self.comboBox_hand_comm_type.setItemText(0, QCoreApplication.translate("MainWindow", u"Modbus", None))
         self.comboBox_hand_comm_type.setItemText(1, QCoreApplication.translate("MainWindow", u"Can", None))
 
         self.label_35.setText(QCoreApplication.translate("MainWindow", u"Comm Type", None))
@@ -627,6 +638,8 @@ class Ui_MainWindow(object):
         self.comboBox_hand_type.setItemText(1, QCoreApplication.translate("MainWindow", u"Left Hand", None))
 
         self.pushButton_refresh_hand_connect_info.setText(QCoreApplication.translate("MainWindow", u"Refresh", None))
+        self.label_hand_read_rate.setText(QCoreApplication.translate("MainWindow", u"Rate (ms)", None))
+        self.lineEdit_hand_read_pos_rate.setText(QCoreApplication.translate("MainWindow", u"20", None))
         self.label_33.setText(QCoreApplication.translate("MainWindow", u"Model", None))
         self.comboBox_hand_model.setItemText(0, QCoreApplication.translate("MainWindow", u"LinkerO6", None))
 
@@ -644,10 +657,10 @@ class Ui_MainWindow(object):
         self.pushButton_save_episode.setText(QCoreApplication.translate("MainWindow", u"Save episode", None))
         self.pushButton_browse_save_path.setText(QCoreApplication.translate("MainWindow", u"Browse...", None))
         self.label_task.setText(QCoreApplication.translate("MainWindow", u"Task", None))
-        self.lineEdit_task.setPlaceholderText(QCoreApplication.translate("MainWindow", u"\u4f8b\u5982\uff1a\u5c06\u7ea2\u8272\u65b9\u5757\u653e\u5165\u76d2\u5b50", None))
 #if QT_CONFIG(tooltip)
         self.lineEdit_task.setToolTip(QCoreApplication.translate("MainWindow", u"\u6bcf\u6761 episode \u4f7f\u7528\u5f00\u59cb\u91c7\u96c6\u65f6\u586b\u5199\u7684\u4efb\u52a1\u63cf\u8ff0\uff1b\u4fdd\u5b58\u6216\u4e22\u5f03\u540e\u53ef\u4fee\u6539\u3002", None))
 #endif // QT_CONFIG(tooltip)
+        self.lineEdit_task.setPlaceholderText(QCoreApplication.translate("MainWindow", u"\u4f8b\u5982\uff1a\u5c06\u7ea2\u8272\u65b9\u5757\u653e\u5165\u76d2\u5b50", None))
         self.label_recording_format.setText(QCoreApplication.translate("MainWindow", u"Format", None))
 #if QT_CONFIG(tooltip)
         self.comboBox_recording_format.setToolTip(QCoreApplication.translate("MainWindow", u"\u9009\u62e9 LeRobot \u6570\u636e\u96c6\u683c\u5f0f\uff1b\u4fdd\u5b58\u6216\u4e22\u5f03\u672c\u6761 episode \u540e\u53ef\u5207\u6362\u3002", None))
@@ -660,8 +673,6 @@ class Ui_MainWindow(object):
         self.label_camera_frame_interval.setText(QCoreApplication.translate("MainWindow", u"Interval (ms)", None))
         self.lineEdit_camera_frame_interval.setText(QCoreApplication.translate("MainWindow", u"20", None))
         self.pushButton_camera_refresh.setText(QCoreApplication.translate("MainWindow", u"Refresh Devices List", None))
-        self.pushButton_camera_connect_all.setText(QCoreApplication.translate("MainWindow", u"Connect All", None))
-        self.pushButton_camera_disconnect_all.setText(QCoreApplication.translate("MainWindow", u"Disconnect All", None))
         self.groupBox_camera_1.setTitle(QCoreApplication.translate("MainWindow", u"Camera 1 (Side View)", None))
         self.label_camera_device_1.setText(QCoreApplication.translate("MainWindow", u"Device", None))
         self.pushButton_connect_side_camera.setText(QCoreApplication.translate("MainWindow", u"Connect", None))

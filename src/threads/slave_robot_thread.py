@@ -190,7 +190,7 @@ class SlaveRobotThread(QObject):
             logging.exception("从手去使能失败")
         return False
 
-    @Slot(list, float, float, float)
+
     def Move_j(self, target_positions: list, speed: float,
                acceleration: float, deceleration: float) -> bool:
         if self.device is None or not self.device.is_connected or not self.device.is_enabled:
@@ -202,7 +202,18 @@ class SlaveRobotThread(QObject):
             logging.exception("从手 Move_j 失败")
             return False
 
-    @Slot(list, float, float, float)
+    @Slot(str, list, float, float)
+    def move_home(self, home_joints: list,
+                  speed: float =50, acceleration: float =100) -> None:
+        if (not self.is_connect or not self.is_enable or self.device is None):
+            Logger.instance().error("从手未连接、未上电或型号已改变，无法执行 Home")
+            return
+        if self.Move_j(home_joints, speed, acceleration, acceleration):
+            Logger.instance().info(f"从手已发送 Home 关节运动：{self.device.name}")
+        else:
+            Logger.instance().error(f"从手 Home 关节运动失败：{self.device.name}")
+
+
     def Move_l(self, target_positions: list, speed: float,
                acceleration: float, deceleration: float) -> bool:
         if self.device is None or not self.device.is_connected or not self.device.is_enabled:

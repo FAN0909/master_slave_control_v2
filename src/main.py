@@ -1,5 +1,7 @@
 """应用入口：创建并显示主窗口。"""
 
+import json
+import math
 import sys
 from functools import partial
 from ipaddress import IPv4Address
@@ -40,6 +42,7 @@ class MainWindow(QMainWindow):
     request_slave_disconnect = Signal()
     request_slave_power_on = Signal()
     request_slave_power_off = Signal()
+    request_slave_home = Signal(list,int)
     request_hand_connect = Signal(str, dict, int)
     request_hand_disconnect = Signal()
     request_camera_refresh = Signal(str, dict)
@@ -50,6 +53,7 @@ class MainWindow(QMainWindow):
     request_camera_disconnect_front = Signal()
     request_camera_disconnect_hand = Signal()
 
+    MAX_HOME_SPEED = 50
     def __init__(self):
         super().__init__()
         self.ui = Ui_MainWindow()
@@ -102,6 +106,8 @@ class MainWindow(QMainWindow):
         self.ui.Btn_robot_connect.clicked.connect(self._toggle_slave_connection)
         self.ui.pushButton_robot_PowerOn.clicked.connect(self._toggle_slave_power)
         self.ui.pushButton_robot_PowerOn.setEnabled(False)
+        self.ui.pushButton_slave_home_pos.clicked.connect(self._move_slave_home)
+        self.ui.pushButton_slave_home_pos.setEnabled(False)
 
         # hand 相关按钮
         self.ui.pushButton_refresh_hand_connect_info.clicked.connect(
@@ -172,6 +178,7 @@ class MainWindow(QMainWindow):
         self.request_slave_disconnect.connect(self.slave_worker.disconnect_device)
         self.request_slave_power_on.connect(self.slave_worker.power_on)
         self.request_slave_power_off.connect(self.slave_worker.power_off)
+        self.request_slave_home.connect(self.slave_worker.move_home)
         self.slave_worker.sig_connection_changed.connect(self._on_slave_connection_changed)
         self.slave_worker.sig_power_changed.connect(self._on_slave_power_changed)
         self.slave_worker.sig_joint_positions.connect(
@@ -350,6 +357,7 @@ class MainWindow(QMainWindow):
             self.slave_enabled = False
             self.ui.pushButton_robot_PowerOn.setText("PowerOn")
         self.ui.pushButton_robot_PowerOn.setEnabled(connected)
+        self.ui.pushButton_slave_home_pos.setEnabled(connected and self.slave_enabled)
         self._set_connection_status(
             self.ui.label_slave_status,
             "● Connected" if connected else "● Disconnected",
@@ -375,6 +383,29 @@ class MainWindow(QMainWindow):
         self.slave_enabled = enabled
         self.ui.pushButton_robot_PowerOn.setText("PowerOff" if enabled else "PowerOn")
         self.ui.pushButton_robot_PowerOn.setEnabled(self.slave_connected)
+        self.ui.pushButton_slave_home_pos.setEnabled(self.slave_connected and enabled)
+
+    @Slot()
+    def _move_slave_home(self) -> None:
+        if not self.slave_connected or not self.slave_enabled or not self.slave_model:
+            self.logger.error("从手未连接或未上电，无法回到 Home 点")
+            return
+
+        try:
+            with self.set_dialog.CONFIG_PATH.open("r", encoding="utf-8") as config_file:
+                model_config = json.load(config_file)[self.slave_model]
+            home_joints = model_config["HOME_JOINTS"]
+            joint_count = model_config["JOINT_COUNT"]
+            if (not isinstance(home_joints, list) or len(home_joints) != joint_count
+                    or any(type(value) not in (int, float) or not math.isfinite(value)
+                           for value in home_joints)):
+                raise ValueError(f"HOME_JOINTS 必须包含 {joint_count} 个有效关节值")
+
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
+            self.logger.error(f"读取从手型号 {self.slave_model} 的 Home 配置失败：{error}")
+            return
+
+        self.request_slave_home.emit(home_joints,self.MAX_HOME_SPEED)
 
 #endregion====================================slave相关=============================================
 
