@@ -190,6 +190,7 @@ class MainWindow(QMainWindow):
         self.hand_worker.moveToThread(self.hand_thread)
         self.request_hand_connect.connect(self.hand_worker.connect_device)
         self.request_hand_disconnect.connect(self.hand_worker.disconnect_device)
+        self.set_dialog.sig_test_hand_action.connect(self.hand_worker.test_action)
         self.hand_worker.sig_connection_changed.connect(self._on_hand_connection_changed)
         self.hand_worker.sig_joint_positions.connect(
             self.set_dialog.update_hand_joint_positions

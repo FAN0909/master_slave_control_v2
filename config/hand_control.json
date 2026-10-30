@@ -45,7 +45,7 @@
         "force": 255
       },
       "open1": {
-        "description": "",
+        "description": "open1",
         "speed": 255,
         "force": 255,
         "positions": [
@@ -58,7 +58,7 @@
         ]
       },
       "close1": {
-        "description": "",
+        "description": "colse1",
         "speed": 255,
         "force": 255,
         "positions": [

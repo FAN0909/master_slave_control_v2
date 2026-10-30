@@ -145,3 +145,21 @@ class HandThread(QObject):
 
     def Set_force(self, force: list) -> bool:
         return self._set_values("Set_force", force)
+
+    @Slot(str, str, list, int, int)
+    def test_action(self, model: str, name: str, positions: list,
+                    speed: int, force: int) -> None:
+        if (not self.is_connect or self.device is None
+                or not self.device.is_connected or self.device.name != model):
+            Logger.instance().error(f"无法测试动作 {name}：灵巧手未连接或型号已改变")
+            return
+        if not self.Set_speed([speed] * len(positions)):
+            Logger.instance().error(f"测试动作 {name} 失败：设置速度失败")
+            return
+        if not self.Set_force([force] * len(positions)):
+            Logger.instance().error(f"测试动作 {name} 失败：设置力度失败")
+            return
+        if not self.Set_joint_positions(positions):
+            Logger.instance().error(f"测试动作 {name} 失败：发送关节位置失败")
+            return
+        Logger.instance().info(f"已发送灵巧手测试动作：{name}")
