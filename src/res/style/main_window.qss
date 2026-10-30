@@ -87,24 +87,24 @@ QPushButton:disabled {
 }
 
 /* Labels with a special purpose use a role rather than an object name. */
-QLabel[uiRole="armStatus"] {
+QLabel[uiRole="connectionStatus"] {
     border-radius: 8px;
     padding: 3px 7px;
     font-weight: 600;
 }
-QLabel[armState="disconnected"] {
-    color: #63758a;
-    background: #e9eef3;
+QLabel[connectionState="disconnected"] {
+    color: #ac3340;
+    background: #fde9eb;
 }
-QLabel[armState="connecting"], QLabel[armState="disconnecting"] {
+QLabel[connectionState="connecting"], QLabel[connectionState="disconnecting"] {
     color: #986500;
     background: #fff3d6;
 }
-QLabel[armState="connected"] {
+QLabel[connectionState="connected"] {
     color: #227343;
     background: #dcf3e4;
 }
-QLabel[armState="failed"], QLabel[armState="disconnect_failed"] {
+QLabel[connectionState="failed"], QLabel[connectionState="disconnect_failed"] {
     color: #ac3340;
     background: #fde9eb;
 }

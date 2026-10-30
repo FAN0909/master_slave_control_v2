@@ -13,6 +13,14 @@
       "min": 0,
       "max": 255
     },
+    "speed_range":{
+      "min": 0,
+      "max": 255
+    },
+    "force_range":{
+      "min": 0,
+      "max": 255
+    },
     "default_speed": 255,
     "default_force": 255,
     "current_close": "close1",
@@ -45,7 +53,7 @@
         "force": 255
       },
       "open1": {
-        "description": "",
+        "description": "open1",
         "speed": 255,
         "force": 255,
         "positions": [
@@ -58,7 +66,7 @@
         ]
       },
       "close1": {
-        "description": "",
+        "description": "colse1",
         "speed": 255,
         "force": 255,
         "positions": [

@@ -1,5 +1,7 @@
+import ctypes
 import json
 import math
+import sysconfig
 from pathlib import Path
 
 from src.log import Logger
@@ -7,6 +9,20 @@ from src.devices.base.base_robotArm import BaseRobotArm
 
 # NRC 的原生扩展依赖系统库；连接 NRC 时再加载，避免它阻断整个界面启动。
 nrc_interface = None
+
+
+def _load_nrc_interface():
+    """加载 NRC SDK；若原生扩展找不到 libpython，则从当前 Python 环境加载后重试。"""
+    try:
+        from vendor.nrc import nrc_interface as sdk
+    except ImportError as error:
+        if "libpython" not in str(error):
+            raise
+        libpython = Path(sysconfig.get_config_var("LIBDIR")) / sysconfig.get_config_var("LDLIBRARY")
+        ctypes.CDLL(str(libpython), mode=ctypes.RTLD_GLOBAL)
+        from vendor.nrc import nrc_interface as sdk
+    return sdk
+
 
 class NrcArm(BaseRobotArm):
 
@@ -59,8 +75,7 @@ class NrcArm(BaseRobotArm):
         global nrc_interface
         try:
             if nrc_interface is None:
-                from vendor.nrc import nrc_interface as sdk
-                nrc_interface = sdk
+                nrc_interface = _load_nrc_interface()
 
             #连接前先加载配置文件  以后修改配置文件后重新连接即可生效
             self._load_config(self.CONFIG_PATH)
