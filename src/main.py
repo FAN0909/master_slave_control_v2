@@ -17,6 +17,7 @@ if __package__:
     from .log import Logger
     from .threads.camera_thread import CameraThread
     from .threads.hand_thread import HandThread
+    from .threads.joint_snapshot import JointSnapshot
     from .threads.master_robot_thread import MasterRobotThread
     from .threads.slave_robot_thread import SlaveRobotThread
     from .ui.settings_dialog import SettingsDialog
@@ -26,6 +27,7 @@ else:
     from src.log import Logger
     from src.threads.camera_thread import CameraThread
     from src.threads.hand_thread import HandThread
+    from src.threads.joint_snapshot import JointSnapshot
     from src.threads.master_robot_thread import MasterRobotThread
     from src.threads.slave_robot_thread import SlaveRobotThread
     from src.ui.settings_dialog import SettingsDialog
@@ -71,6 +73,7 @@ class MainWindow(QMainWindow):
         self.hand_model = None
         self.hand_connected = False
         self.camera_connected = {camera: False for camera in ("side", "front", "hand")}
+        self.master_joint_snapshot = JointSnapshot()
 
 
         self.init_ui()
@@ -163,7 +166,7 @@ class MainWindow(QMainWindow):
     
     def init_master_thread(self):
         self.master_thread = QThread(self)
-        self.master_worker = MasterRobotThread()
+        self.master_worker = MasterRobotThread(self.master_joint_snapshot)
         self.master_worker.moveToThread(self.master_thread)
         self.request_master_connect.connect(self.master_worker.connect_device)
         self.request_master_disconnect.connect(self.master_worker.disconnect_device)
@@ -177,7 +180,7 @@ class MainWindow(QMainWindow):
 
     def init_slave_thread(self):
         self.slave_thread = QThread(self)
-        self.slave_worker = SlaveRobotThread()
+        self.slave_worker = SlaveRobotThread(self.master_joint_snapshot)
         self.slave_worker.moveToThread(self.slave_thread)
         self.request_slave_connect.connect(self.slave_worker.connect_device)
         self.request_slave_disconnect.connect(self.slave_worker.disconnect_device)

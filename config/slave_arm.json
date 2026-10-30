@@ -7,6 +7,12 @@
     "SERVO_J_VMAX": 80.0,
     "SERVO_J_AVMAX": 1000.0,
     "SERVO_J_JMAX": 1000.0,
+    "_FOLLOW_JOINT_MAP说明": "按从手关节0到6排列；每个值是对应的主手关节编号（从0开始）。例如第0项为2，表示从手关节0跟随主手关节2。",
+    "FOLLOW_JOINT_MAP": [0, 1, 2, 3, 4, 5, 6],
+    "_FOLLOW_JOINT_DIRECTION说明": "按从手关节0到6排列；1表示与对应主手关节同方向运动，-1表示反方向运动。",
+    "FOLLOW_JOINT_DIRECTION": [1, 1, 1, 1, 1, 1, 1],
+    "_FOLLOW_JOINT_GAIN说明": "按从手关节0到6排列；每个值是主手关节增量的倍率。例如0.5表示主手移动10度时，从手移动5度。",
+    "FOLLOW_JOINT_GAIN": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
     "HOME_JOINTS": [
       0.0,
       0.0,

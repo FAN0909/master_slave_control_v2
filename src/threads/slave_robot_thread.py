@@ -1,4 +1,4 @@
-"""NRC 从手工作对象：驱动命令和状态读取，不承担遥操作计算。"""
+"""NRC 从手工作对象：驱动命令、状态读取和关节增量跟随。"""
 
 import logging
 import math
@@ -7,6 +7,7 @@ from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 from src.devices.drivers_factory import create_slave_arm
 from src.log import Logger
+from src.threads.joint_snapshot import JointSnapshot
 
 
 class SlaveRobotThread(QObject):
@@ -16,13 +17,19 @@ class SlaveRobotThread(QObject):
     sig_tcp_positions = Signal(list)
     sig_follow_changed = Signal(bool)
 
-    def __init__(self):
+    def __init__(self, joint_snapshot: JointSnapshot | None = None):
         super().__init__()
         self.device = None
+        self.joint_snapshot = joint_snapshot
         self.is_connect = False
         self.is_enable = False
         self.is_following = False
         self._resume_read_after_follow = False
+        self._master_start: tuple[float, ...] | None = None
+        self._slave_start: tuple[float, ...] | None = None
+        self._last_target: tuple[float, ...] | None = None
+        self._master_generation: int | None = None
+        self._follow_interval_ms = 0
 
         self.read_timer = QTimer(self)
         self.read_timer.timeout.connect(self.read_positions)
@@ -49,13 +56,36 @@ class SlaveRobotThread(QObject):
             self.sig_follow_changed.emit(self.is_following)
             return False
         if not self.follow_timer.isActive():
+            sample = self.joint_snapshot.read() if self.joint_snapshot is not None else None
+            count = getattr(self.device, "JOINT_COUNT", 0)
+            if (sample is None or count <= 0 or len(sample.positions) != count
+                    or not all(math.isfinite(value) for value in sample.positions)):
+                Logger.instance().error("没有有效的主手关节快照，无法开始跟随")
+                self.sig_follow_changed.emit(False)
+                return False
+            slave_positions = self.Get_joint_positions()
+            if (len(slave_positions) != count
+                    or not all(math.isfinite(value) for value in slave_positions)):
+                Logger.instance().error("无法读取有效的从手关节位置，无法开始跟随")
+                self.sig_follow_changed.emit(False)
+                return False
             if not self.Open_servoJ():
                 Logger.instance().error("从手 servoJ 开启失败，无法开始跟随")
                 self.sig_follow_changed.emit(False)
                 return False
+            if not self.Set_servoJ_pos(slave_positions):
+                self.Close_servoJ()
+                Logger.instance().error("从手 servoJ 初始位置发送失败，无法开始跟随")
+                self.sig_follow_changed.emit(False)
+                return False
+            self._master_start = sample.positions
+            self._slave_start = tuple(slave_positions)
+            self._last_target = tuple(slave_positions)
+            self._master_generation = sample.generation
             # 跟随期间暂停位置轮询，停止跟随后按原周期恢复。
             self._resume_read_after_follow = self.read_timer.isActive()
             self.stop_timer_work()
+        self._follow_interval_ms = interval_ms
         self.follow_timer.start(interval_ms)
         self.is_following = True
         self.sig_follow_changed.emit(True)
@@ -71,6 +101,11 @@ class SlaveRobotThread(QObject):
             if self.is_connect and not self.Close_servoJ():
                 Logger.instance().error("从手 servoJ 关闭失败")
         self.is_following = False
+        self._master_start = None
+        self._slave_start = None
+        self._last_target = None
+        self._master_generation = None
+        self._follow_interval_ms = 0
         Logger.instance().info(f" stop follow")
         if self._resume_read_after_follow and self.is_connect:
             self.read_timer.start()
@@ -302,5 +337,47 @@ class SlaveRobotThread(QObject):
             logging.exception("从手 Set_servoJ_pos 失败")
             return False
 
-    def follow_move(self):
-        pass
+    @Slot()
+    def follow_move(self) -> None:
+        if not self.is_following or self.device is None:
+            return
+        if not self.device.is_connected or not self.device.is_enabled:
+            self.is_connect = bool(self.device.is_connected)
+            self.stop_follow_work()
+            return
+        sample = self.joint_snapshot.read() if self.joint_snapshot is not None else None
+        if (sample is None or sample.generation != self._master_generation
+                or self._master_start is None or self._slave_start is None
+                or self._last_target is None):
+            return
+        if (len(sample.positions) != len(self._master_start)
+                or not all(math.isfinite(value) for value in sample.positions)):
+            return
+
+        # 主手相对启动位置的关节增量，经轴映射后加到从手启动位置。
+        joint_map = self.device.FOLLOW_JOINT_MAP
+        direction = self.device.FOLLOW_JOINT_DIRECTION
+        gain = self.device.FOLLOW_JOINT_GAIN
+        desired = tuple(
+            self._slave_start[i] + direction[i] * gain[i] * (
+                sample.positions[joint_map[i]] - self._master_start[joint_map[i]]
+            )
+            for i in range(len(self._slave_start))
+        )
+        if not all(math.isfinite(value) for value in desired):
+            Logger.instance().error("从手跟随目标包含无效关节角，已停止跟随")
+            self.stop_follow_work()
+            return
+        # 单次目标变化不超过驱动配置的速度上限对应的周期位移。
+        max_step = self.device.SERVO_J_VMAX * self._follow_interval_ms / 1000
+        target = tuple(
+            previous + max(-max_step, min(max_step, goal - previous))
+            for previous, goal in zip(self._last_target, desired)
+        )
+        if target == self._last_target:
+            return
+        if not self.Set_servoJ_pos(list(target)):
+            Logger.instance().error("从手跟随目标发送失败，已停止跟随")
+            self.stop_follow_work()
+            return
+        self._last_target = target

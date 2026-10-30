@@ -65,6 +65,26 @@ class NrcArm(BaseRobotArm):
                 if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
                     raise ValueError(f"{key} 必须是有限的正数")
                 setattr(self, key, float(value))
+            joint_map = config["FOLLOW_JOINT_MAP"]
+            direction = config["FOLLOW_JOINT_DIRECTION"]
+            gain = config["FOLLOW_JOINT_GAIN"]
+            joint_count = self.JOINT_COUNT
+            if (not isinstance(joint_map, list)
+                    or len(joint_map) != joint_count
+                    or any(type(index) is not int for index in joint_map)
+                    or sorted(joint_map) != list(range(joint_count))):
+                raise ValueError("FOLLOW_JOINT_MAP 必须是从手关节对应的主手关节排列")
+            if (not isinstance(direction, list) or len(direction) != joint_count
+                    or any(type(value) is not int or value not in (-1, 1)
+                           for value in direction)):
+                raise ValueError("FOLLOW_JOINT_DIRECTION 只能包含 +1 或 -1")
+            if (not isinstance(gain, list) or len(gain) != joint_count
+                    or any(type(value) not in (int, float)
+                           or not math.isfinite(value) or value <= 0 for value in gain)):
+                raise ValueError("FOLLOW_JOINT_GAIN 必须包含正的有限数值")
+            self.FOLLOW_JOINT_MAP = tuple(joint_map)
+            self.FOLLOW_JOINT_DIRECTION = tuple(direction)
+            self.FOLLOW_JOINT_GAIN = tuple(float(value) for value in gain)
         except (OSError, ValueError, KeyError, TypeError) as error:
             message = f"NRC 配置读取失败 ({path}): {error}"
             Logger.instance().error(message)
