@@ -49,19 +49,29 @@ class SlaveRobotThread(QObject):
             self.sig_follow_changed.emit(self.is_following)
             return False
         if not self.follow_timer.isActive():
+            if not self.Open_servoJ():
+                Logger.instance().error("从手 servoJ 开启失败，无法开始跟随")
+                self.sig_follow_changed.emit(False)
+                return False
             # 跟随期间暂停位置轮询，停止跟随后按原周期恢复。
             self._resume_read_after_follow = self.read_timer.isActive()
             self.stop_timer_work()
         self.follow_timer.start(interval_ms)
         self.is_following = True
         self.sig_follow_changed.emit(True)
+        Logger.instance().info(f" start follow")
+
         return True
 
     @Slot()
     def stop_follow_work(self) -> None:
-        if self.follow_timer.isActive():
+        was_following = self.follow_timer.isActive()
+        if was_following:
             self.follow_timer.stop()
+            if self.is_connect and not self.Close_servoJ():
+                Logger.instance().error("从手 servoJ 关闭失败")
         self.is_following = False
+        Logger.instance().info(f" stop follow")
         if self._resume_read_after_follow and self.is_connect:
             self.read_timer.start()
         self._resume_read_after_follow = False
@@ -111,6 +121,7 @@ class SlaveRobotThread(QObject):
 
     @Slot()
     def power_off(self) -> None:
+        self.stop_follow_work()
         if self.Disable():
             Logger.instance().info("从手已下电")
         else:

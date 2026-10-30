@@ -307,10 +307,9 @@ class NrcArm(BaseRobotArm):
             return False
 
         try:
-
             result = nrc_interface.stop_servoJ(self.servo_fd)
             if result == 0:
-
+                Logger.instance().info(f"[{self.name}] servo J close successfully")
                 return True
             else:
                 return False
