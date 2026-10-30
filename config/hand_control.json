@@ -13,6 +13,14 @@
       "min": 0,
       "max": 255
     },
+    "speed_range":{
+      "min": 0,
+      "max": 255
+    },
+    "force_range":{
+      "min": 0,
+      "max": 255
+    },
     "default_speed": 255,
     "default_force": 255,
     "current_close": "close1",

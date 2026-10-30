@@ -27,6 +27,7 @@ class SettingsDialog(QDialog):
         self.ui.buttonBox.rejected.connect(self.reject)
         self.ui.pushButton_save_slave_param.clicked.connect(self.save_slave_config)
         table = self.ui.tableWidget_hand_actions
+        table.verticalHeader().setVisible(False)
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.ui.pushButton_add_hand_actions.clicked.connect(self.add_hand_action)
@@ -71,10 +72,10 @@ class SettingsDialog(QDialog):
 
 
 #region===================================slave配置文件的读写=======================================
-    def update_slave_config(self, model: str) -> bool:
+    def update_slave_config(self, model: str|None) -> bool:
         self.slave_model = model
         if self.slave_model is None:
-            return
+            return False
         
         try:
             with self.CONFIG_PATH.open("r", encoding="utf-8") as config_file:
@@ -143,11 +144,10 @@ class SettingsDialog(QDialog):
 #endregion===================================slave配置文件的读写=======================================
 
 #region===================================hand配置文件的读写========================================
-    def update_hand_config(self, model: str) -> bool:
+    def update_hand_config(self, model: str| None) -> bool:
         self.hand_model = model
 
         table = self.ui.tableWidget_hand_actions
-        table.verticalHeader().setVisible(False)
         close_combo = self.ui.comboBox_hand_current_close
         open_combo = self.ui.comboBox_hand_current_open
         test_combo = self.ui.comboBox_hand_actions_test
@@ -167,8 +167,8 @@ class SettingsDialog(QDialog):
 
             joint_names = model_config["joint_names"]
             joint_count = model_config["joint_count"]
-            if joint_count != 6 or len(joint_names) != joint_count:
-                raise ValueError("手部配置的关节数量必须为 6")
+            if  len(joint_names) != joint_count:
+                raise ValueError("手部配置文件的关节数和关节名称数量不一致")
 
             actions = model_config["actions"]
             if not isinstance(actions, dict):
@@ -194,7 +194,7 @@ class SettingsDialog(QDialog):
         blocker = QSignalBlocker(table)
         table.setColumnCount(joint_count + 4)
         table.setHorizontalHeaderLabels(
-            ["动作", "描述", *joint_names, "速度", "力度"]
+            ["动作", "描述", *joint_names, "speed", "force"]
         )
         table.setRowCount(len(rows))
         for row_index, values in enumerate(rows):
@@ -210,6 +210,7 @@ class SettingsDialog(QDialog):
         open_combo.setCurrentText(current_open)
         return True
 
+    #如果用户修改动作名称  则自动更新下面那三个下拉框中的动作名称
     def _hand_action_cell_changed(self, _row: int, column: int) -> None:
         if column == 0:
             self._sync_hand_action_combos()
