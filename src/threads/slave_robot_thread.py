@@ -14,14 +14,21 @@ class SlaveRobotThread(QObject):
     sig_power_changed = Signal(bool)
     sig_joint_positions = Signal(list)
     sig_tcp_positions = Signal(list)
+    sig_follow_changed = Signal(bool)
 
     def __init__(self):
         super().__init__()
         self.device = None
         self.is_connect = False
         self.is_enable = False
+        self.is_following = False
+        self._resume_read_after_follow = False
+
         self.read_timer = QTimer(self)
         self.read_timer.timeout.connect(self.read_positions)
+
+        self.follow_timer = QTimer(self)
+        self.follow_timer.timeout.connect(self.follow_move)
 
     def start_timer_work(self, interval_ms: int) -> bool:
         if interval_ms <= 0 or not self.is_connect:
@@ -35,6 +42,30 @@ class SlaveRobotThread(QObject):
     def stop_timer_work(self) -> None:
         if self.read_timer.isActive():
             self.read_timer.stop()
+
+    @Slot(int)
+    def start_follow_work(self, interval_ms: int) -> bool:
+        if not 0 < interval_ms <= 2_147_483_647 or not self.is_connect:
+            self.sig_follow_changed.emit(self.is_following)
+            return False
+        if not self.follow_timer.isActive():
+            # 跟随期间暂停位置轮询，停止跟随后按原周期恢复。
+            self._resume_read_after_follow = self.read_timer.isActive()
+            self.stop_timer_work()
+        self.follow_timer.start(interval_ms)
+        self.is_following = True
+        self.sig_follow_changed.emit(True)
+        return True
+
+    @Slot()
+    def stop_follow_work(self) -> None:
+        if self.follow_timer.isActive():
+            self.follow_timer.stop()
+        self.is_following = False
+        if self._resume_read_after_follow and self.is_connect:
+            self.read_timer.start()
+        self._resume_read_after_follow = False
+        self.sig_follow_changed.emit(False)
 
     @Slot()
     def read_positions(self) -> None:
@@ -109,6 +140,7 @@ class SlaveRobotThread(QObject):
 
     @Slot()
     def Disconnect(self) -> bool:
+        self.stop_follow_work()
         self.stop_timer_work()
         if self.device is None:
             return False
@@ -258,3 +290,6 @@ class SlaveRobotThread(QObject):
         except Exception:
             logging.exception("从手 Set_servoJ_pos 失败")
             return False
+
+    def follow_move(self):
+        pass
