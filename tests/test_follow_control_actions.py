@@ -45,7 +45,7 @@ class FollowControlActionsTests(unittest.TestCase):
             dialog.ui.lineEdit_save_file_path.setText(directory)
             dialog.ui.pushButton_start_recod.click()
             pipeline.start.assert_called_once_with(
-                Path(directory).resolve(), "pick object", 50, ("side",), False
+                Path(directory).resolve(), "pick object", 50, ("side",), False, "v3.0"
             )
             camera_signal.emit.assert_called_with(True)
             feedback_signal.emit.assert_called_with(True)
@@ -71,6 +71,24 @@ class FollowControlActionsTests(unittest.TestCase):
             self.assertEqual(events, [
                 ("home",), ("follow_start", 20), ("follow_stop",),
             ])
+
+    def test_format_selection_reaches_pipeline_and_locks_during_recording(self):
+        with tempfile.TemporaryDirectory() as directory:
+            dialog = FollowControlDialog()
+            dialog.record_pipeline = Mock()
+            dialog.controller = SimpleNamespace(
+                slave_following=True, master_connected=True, slave_connected=True,
+                follow_interval_ms=50, camera_connected={}, hand_connected=False,
+                request_slave_record_feedback=Mock(),
+            )
+            dialog.ui.lineEdit_task.setText("pick object")
+            dialog.ui.lineEdit_save_file_path.setText(directory)
+            dialog.ui.comboBox_recording_format.setCurrentIndex(1)
+            dialog.ui.pushButton_start_recod.click()
+            dialog.record_pipeline.start.assert_called_once_with(
+                Path(directory).resolve(), "pick object", 20, (), False, "v2.1"
+            )
+            self.assertFalse(dialog.ui.comboBox_recording_format.isEnabled())
 
     def test_close_waits_for_episode_save(self):
         dialog = FollowControlDialog()

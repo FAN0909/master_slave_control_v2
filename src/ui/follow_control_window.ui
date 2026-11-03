@@ -148,11 +148,16 @@
           <item row="2" column="1" colspan="4">
            <widget class="QComboBox" name="comboBox_recording_format">
             <property name="toolTip">
-             <string>使用 LeRobot v3.0 数据集格式。</string>
+             <string>选择当前 episode 的 LeRobot 数据集格式。</string>
             </property>
             <item>
              <property name="text">
               <string>lerobotV3.0</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>lerobotV2.1</string>
              </property>
             </item>
            </widget>

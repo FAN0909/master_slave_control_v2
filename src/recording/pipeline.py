@@ -11,6 +11,7 @@ from time import monotonic, monotonic_ns
 from PySide6.QtCore import QObject, Signal
 
 from .lerobot_recorder import LeRobotRecorder
+from .lerobot_v21_recorder import LeRobotV21Recorder
 
 
 class RecordingMailbox:
@@ -75,12 +76,16 @@ class RecordingPipeline(QObject):
         self._stats = self._empty_stats()
         self._active = False
 
-    def start(self, root, task: str, fps: int, cameras: tuple[str, ...], hand: bool) -> None:
+    def start(self, root, task: str, fps: int, cameras: tuple[str, ...], hand: bool,
+              recording_format: str = "v3.0") -> None:
         if self._active:
             raise RuntimeError("已有采集任务")
+        if recording_format not in ("v2.1", "v3.0"):
+            raise ValueError(f"不支持的采集格式：{recording_format}")
         if importlib.util.find_spec("lerobot") is None:
             raise RuntimeError("未安装 LeRobot；请安装 requirements.txt")
         self.root, self.task, self.fps = root, task, fps
+        self.recording_format = recording_format
         self.cameras, self.hand = cameras, hand
         self._keys = ("master", "slave", "target") + (("hand",) if hand else ()) + tuple(
             f"camera:{camera}" for camera in cameras
@@ -181,7 +186,8 @@ class RecordingPipeline(QObject):
         try:
             preflight = self._wait_for_first_frame()
             if preflight is not None:
-                recorder = LeRobotRecorder(self.root, self.task, self.fps, self.cameras)
+                recorder_type = LeRobotV21Recorder if self.recording_format == "v2.1" else LeRobotRecorder
+                recorder = recorder_type(self.root, self.task, self.fps, self.cameras)
                 prepare_start_ns = monotonic_ns()
                 recorder.prepare(*preflight)
                 self._stats["prepare_ms"] = (monotonic_ns() - prepare_start_ns) / 1_000_000

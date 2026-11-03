@@ -21,6 +21,8 @@ class FollowControlDialog(QDialog):
         super().__init__(parent)
         self.ui = Ui_FollowControlDialog()
         self.ui.setupUi(self)
+        self.ui.comboBox_recording_format.setItemData(0, "v3.0")
+        self.ui.comboBox_recording_format.setItemData(1, "v2.1")
         self.settings = QSettings("master_slave_control_v2", "follow_control")
         self.DEFAULT_SAVE_PATH.mkdir(parents=True, exist_ok=True)
         self.save_path = self.DEFAULT_SAVE_PATH
@@ -76,7 +78,7 @@ class FollowControlDialog(QDialog):
         self.ui.pushButton_save_episode.setEnabled(pending and count > 0)
         self.ui.pushButton_discard_episode.setEnabled(pending)
         for control in (self.ui.lineEdit_task, self.ui.lineEdit_save_file_path,
-                        self.ui.pushButton_browse_save_path):
+                        self.ui.pushButton_browse_save_path, self.ui.comboBox_recording_format):
             control.setEnabled(state == "idle")
 
     def _toggle_follow(self) -> None:
@@ -112,6 +114,10 @@ class FollowControlDialog(QDialog):
         if not controller.slave_following or not controller.master_connected or not controller.slave_connected:
             Logger.instance().error("请先连接主从手并启动跟随")
             return
+        recording_format = self.ui.comboBox_recording_format.currentData()
+        if recording_format not in ("v2.1", "v3.0"):
+            Logger.instance().error("请选择支持的采集格式")
+            return
         try:
             interval_ms = controller.follow_interval_ms
             if interval_ms <= 0 or 1000 % interval_ms:
@@ -122,7 +128,7 @@ class FollowControlDialog(QDialog):
             self.record_hand = controller.hand_connected
             self.record_pipeline.start(
                 self.save_path, task, 1000 // interval_ms,
-                self.record_cameras, self.record_hand,
+                self.record_cameras, self.record_hand, recording_format,
             )
         except (OSError, RuntimeError, ValueError) as error:
             Logger.instance().error(f"开始采集失败：{error}")
@@ -133,7 +139,7 @@ class FollowControlDialog(QDialog):
         controller.request_slave_record_feedback.emit(True)
         self.record_state = "recording"
         self.set_recording_state(self.record_state, self.record_count)
-        Logger.instance().info(f"正在准备 LeRobot v3.0 采集：{task}")
+        Logger.instance().info(f"正在准备 LeRobot {recording_format} 采集：{task}")
 
     @Slot()
     def _on_record_ready(self) -> None:
@@ -199,7 +205,8 @@ class FollowControlDialog(QDialog):
     @Slot(str, str, object)
     def _on_record_finished(self, decision: str, path: str, stats: dict) -> None:
         Logger.instance().info(
-            f"LeRobot episode 已保存：{path}" if decision == "save" else "episode 已丢弃"
+            f"LeRobot {self.ui.comboBox_recording_format.currentData()} episode 已保存：{path}"
+            if decision == "save" else "episode 已丢弃"
         )
         self.record_state = "idle"
         self.record_cameras = ()
