@@ -1,6 +1,9 @@
 """关节增量跟随的快照与目标计算，不连接真实机器人。"""
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -41,16 +44,21 @@ class FollowSnapshotTests(unittest.TestCase):
             snapshot.update([10.0] * 7)
         device = SimpleNamespace(
             JOINT_COUNT=7, SERVO_J_VMAX=80.0,
-            FOLLOW_JOINT_MAP=(1, 0, 2, 3, 4, 5, 6),
-            FOLLOW_JOINT_DIRECTION=(-1, 1, 1, 1, 1, 1, 1),
-            FOLLOW_JOINT_GAIN=(0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
             is_connected=True, is_enabled=True,
             Get_joint_positions=Mock(return_value=[30.0] * 7),
             Open_servoJ=Mock(return_value=True),
             Set_servoJ_pos=Mock(return_value=True),
             Close_servoJ=Mock(return_value=True),
         )
-        slave = SlaveRobotThread(snapshot)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "follow.json"
+            path.write_text(json.dumps({
+                "FOLLOW_JOINT_DIRECTION": [-1, 1, 1, 1, 1, 1, 1],
+                "FOLLOW_JOINT_GAIN": [0.5, 1, 1, 1, 1, 1, 1],
+            }), encoding="utf-8")
+            with patch.object(SlaveRobotThread, "FOLLOW_CONFIG_PATH", path):
+                slave = SlaveRobotThread(snapshot)
+            path.write_text("{}", encoding="utf-8")  # 已加载的参数不受文件修改影响。
         slave.device = device
         slave.is_connect = True
         slave.is_enable = True
@@ -59,14 +67,14 @@ class FollowSnapshotTests(unittest.TestCase):
         self.assertEqual(device.Set_servoJ_pos.call_args.args[0], [30.0] * 7)
         self.assertFalse(slave.read_timer.isActive())
 
-        snapshot.update([20.0, 14.0, 20.0, 20.0, 20.0, 20.0, 20.0])
+        snapshot.update([12.0, 14.0, 20.0, 20.0, 20.0, 20.0, 20.0])
         slave.follow_move()
         first_target = device.Set_servoJ_pos.call_args.args[0]
-        self.assertAlmostEqual(first_target[0], 28.4)
+        self.assertAlmostEqual(first_target[0], 29.0)
         self.assertAlmostEqual(first_target[1], 31.6)
         slave.follow_move()  # 同一快照仍可逐周期追上目标，不按时间戳停止。
         second_target = device.Set_servoJ_pos.call_args.args[0]
-        self.assertAlmostEqual(second_target[0], 28.0)
+        self.assertAlmostEqual(second_target[0], 29.0)
         self.assertAlmostEqual(second_target[1], 33.2)
         self.assertTrue(slave.is_following)
 
@@ -80,9 +88,6 @@ class FollowSnapshotTests(unittest.TestCase):
         snapshot.update([0.0] * 7)
         device = SimpleNamespace(
             JOINT_COUNT=7, SERVO_J_VMAX=80.0,
-            FOLLOW_JOINT_MAP=tuple(range(7)),
-            FOLLOW_JOINT_DIRECTION=(1,) * 7,
-            FOLLOW_JOINT_GAIN=(1.0,) * 7,
             is_connected=True, is_enabled=True,
             Get_joint_positions=Mock(return_value=[0.0] * 7),
             Open_servoJ=Mock(return_value=True),

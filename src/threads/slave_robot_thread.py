@@ -1,7 +1,9 @@
 """NRC 从手工作对象：驱动命令、状态读取和关节增量跟随。"""
 
+import json
 import logging
 import math
+from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
@@ -11,6 +13,8 @@ from src.threads.joint_snapshot import JointSnapshot
 
 
 class SlaveRobotThread(QObject):
+    FOLLOW_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "follow_params.json"
+
     sig_connection_changed = Signal(bool)
     sig_power_changed = Signal(bool)
     sig_joint_positions = Signal(list)
@@ -19,6 +23,7 @@ class SlaveRobotThread(QObject):
 
     def __init__(self, joint_snapshot: JointSnapshot | None = None):
         super().__init__()
+        self._follow_direction, self._follow_gain = self._load_follow_config()
         self.device = None
         self.joint_snapshot = joint_snapshot
         self.is_connect = False
@@ -36,6 +41,28 @@ class SlaveRobotThread(QObject):
 
         self.follow_timer = QTimer(self)
         self.follow_timer.timeout.connect(self.follow_move)
+
+    def _load_follow_config(self) -> tuple[tuple[int, ...], tuple[float, ...]]:
+        """创建线程时读取一次跟随参数。"""
+        path = self.FOLLOW_CONFIG_PATH
+        try:
+            with path.open(encoding="utf-8") as file:
+                config = json.load(file)
+            direction = config["FOLLOW_JOINT_DIRECTION"]
+            gain = config["FOLLOW_JOINT_GAIN"]
+            if (not isinstance(direction, list) or not direction
+                    or any(type(value) is not int or value not in (-1, 1)
+                           for value in direction)):
+                raise ValueError("FOLLOW_JOINT_DIRECTION 只能包含 +1 或 -1")
+            if (not isinstance(gain, list) or len(gain) != len(direction)
+                    or any(type(value) not in (int, float)
+                           or not math.isfinite(value) or value <= 0 for value in gain)):
+                raise ValueError("FOLLOW_JOINT_GAIN 必须包含与方向参数等长的正数")
+            return tuple(direction), tuple(float(value) for value in gain)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            message = f"跟随参数读取失败 ({path}): {error}"
+            Logger.instance().error(message)
+            raise ValueError(message) from error
 
     def start_timer_work(self, interval_ms: int) -> bool:
         if interval_ms <= 0 or not self.is_connect:
@@ -58,6 +85,10 @@ class SlaveRobotThread(QObject):
         if not self.follow_timer.isActive():
             sample = self.joint_snapshot.read() if self.joint_snapshot is not None else None
             count = getattr(self.device, "JOINT_COUNT", 0)
+            if len(self._follow_direction) != count:
+                Logger.instance().error("跟随参数数量与从手关节数量不一致，无法开始跟随")
+                self.sig_follow_changed.emit(False)
+                return False
             if (sample is None or count <= 0 or len(sample.positions) != count
                     or not all(math.isfinite(value) for value in sample.positions)):
                 Logger.instance().error("没有有效的主手关节快照，无法开始跟随")
@@ -337,6 +368,7 @@ class SlaveRobotThread(QObject):
             logging.exception("从手 Set_servoJ_pos 失败")
             return False
 
+    #关节角度增量跟随  开始跟随时 记录主手关节角度和从手关节角度，之后每次跟随时读取主手关节角度增量，乘以方向和增益后加到从手关节角度上，发送给从手。
     @Slot()
     def follow_move(self) -> None:
         if not self.is_following or self.device is None:
@@ -354,13 +386,12 @@ class SlaveRobotThread(QObject):
                 or not all(math.isfinite(value) for value in sample.positions)):
             return
 
-        # 主手相对启动位置的关节增量，经轴映射后加到从手启动位置。
-        joint_map = self.device.FOLLOW_JOINT_MAP
-        direction = self.device.FOLLOW_JOINT_DIRECTION
-        gain = self.device.FOLLOW_JOINT_GAIN
+        # 同编号主手关节相对启动位置的增量，加到从手启动位置。
+        direction = self._follow_direction
+        gain = self._follow_gain
         desired = tuple(
             self._slave_start[i] + direction[i] * gain[i] * (
-                sample.positions[joint_map[i]] - self._master_start[joint_map[i]]
+                sample.positions[i] - self._master_start[i]
             )
             for i in range(len(self._slave_start))
         )
