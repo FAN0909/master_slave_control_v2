@@ -29,6 +29,8 @@ class Ui_MainWindow(object):
         MainWindow.resize(1349, 1065)
         self.menuSet_Param = QAction(MainWindow)
         self.menuSet_Param.setObjectName(u"menuSet_Param")
+        self.menuFollow_control = QAction(MainWindow)
+        self.menuFollow_control.setObjectName(u"menuFollow_control")
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.verticalLayout_main = QVBoxLayout(self.centralwidget)
@@ -597,6 +599,7 @@ class Ui_MainWindow(object):
 #endif // QT_CONFIG(shortcut)
 
         self.menubar.addAction(self.menuSet_Param)
+        self.menubar.addAction(self.menuFollow_control)
 
         self.retranslateUi(MainWindow)
 
@@ -606,6 +609,7 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
         self.menuSet_Param.setText(QCoreApplication.translate("MainWindow", u"Set Param", None))
+        self.menuFollow_control.setText(QCoreApplication.translate("MainWindow", u"Follow control", None))
         self.groupBox_2.setTitle(QCoreApplication.translate("MainWindow", u"Master Arm", None))
         self.label_31.setText(QCoreApplication.translate("MainWindow", u"port", None))
         self.pushButton_refresh_master_port.setText(QCoreApplication.translate("MainWindow", u"Refresh Port", None))

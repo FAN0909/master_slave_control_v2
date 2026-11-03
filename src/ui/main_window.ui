@@ -843,11 +843,17 @@
     </rect>
    </property>
    <addaction name="menuSet_Param"/>
+   <addaction name="menuFollow_control"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="menuSet_Param">
    <property name="text">
     <string>Set Param</string>
+   </property>
+  </action>
+  <action name="menuFollow_control">
+   <property name="text">
+    <string>Follow control</string>
    </property>
   </action>
  </widget>

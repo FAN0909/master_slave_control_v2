@@ -1,20 +1,111 @@
 """灵巧手工作对象：连接、断开、读取关节与发送原生位置、速度、力矩。"""
+import json
 import logging
 import math
+from pathlib import Path
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from src.devices.drivers_factory import create_hand
 from src.log import Logger
+from src.threads.joint_snapshot import JointSnapshot
 
 class HandThread(QObject):
+    FOLLOW_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "follow_params.json"
+    HAND_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "hand_control.json"
+
     sig_connection_changed = Signal(bool)
     sig_joint_positions = Signal(list)
 
-    def __init__(self):
+    def __init__(self, joint_snapshot: JointSnapshot | None = None):
         super().__init__()
         self.device = None
         self.is_connect = False
+        self.joint_snapshot = joint_snapshot
+        self._follow_generation: int | None = None
+        self._master_seventh_start: float | None = None
+        self._hand_actions: dict | None = None
+        self._hand_state = "open"
         self.read_timer = QTimer(self)
         self.read_timer.timeout.connect(self.read_joint_pos)
+        self.follow_timer = QTimer(self)
+        self.follow_timer.timeout.connect(self.follow_move)
+
+    @Slot(int)
+    def start_follow_work(self, interval_ms: int) -> bool:
+        if (not 0 < interval_ms <= 2_147_483_647 or not self.is_connect
+                or self.device is None or self.joint_snapshot is None):
+            return False
+        sample = self.joint_snapshot.read()
+        if (sample is None or len(sample.positions) < 7
+                or not math.isfinite(sample.positions[6])):
+            Logger.instance().error("没有有效的主手第七轴位置，无法开始灵巧手跟随")
+            return False
+        try:
+            with self.FOLLOW_CONFIG_PATH.open(encoding="utf-8") as file:
+                follow_config = json.load(file)
+            close_delta = follow_config["HAND_CLOSE_DELTA_DEG"]
+            open_delta = follow_config["HAND_OPEN_DELTA_DEG"]
+            if (type(close_delta) not in (int, float) or not math.isfinite(close_delta)
+                    or close_delta <= 0 or type(open_delta) not in (int, float)
+                    or not math.isfinite(open_delta) or not 0 <= open_delta < close_delta):
+                raise ValueError("灵巧手阈值必须满足 0 <= 开阈值 < 关阈值")
+            with self.HAND_CONFIG_PATH.open(encoding="utf-8") as file:
+                hand_config = json.load(file)[self.device.name]
+            actions = {}
+            for state, key in (("open", "current_open"), ("close", "current_close")):
+                action = hand_config["actions"][hand_config[key]]
+                positions = action["positions"]
+                speed, force = action["speed"], action["force"]
+                actions[state] = (positions, speed, force)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            Logger.instance().error(f"灵巧手跟随配置读取失败：{error}")
+            return False
+        self.stop_follow_work()
+        self._close_delta = float(close_delta)
+        self._open_delta = float(open_delta)
+        self._hand_actions = actions
+        self._master_seventh_start = sample.positions[6]
+        self._follow_generation = sample.generation
+        self._hand_state = "open"
+        self.follow_timer.start(interval_ms)
+        return True
+
+    @Slot()
+    def stop_follow_work(self) -> None:
+        self.follow_timer.stop()
+        self._follow_generation = None
+        self._master_seventh_start = None
+        self._hand_actions = None
+        self._hand_state = "open"
+
+    @Slot()
+    def follow_move(self) -> None:
+        if not self.follow_timer.isActive():
+            return
+        if self.device is None or not self.device.is_connected:
+            self.stop_follow_work()
+            return
+        sample = self.joint_snapshot.read()
+        if sample is None or sample.generation != self._follow_generation:
+            self.stop_follow_work()
+            return
+        if len(sample.positions) < 7 or not math.isfinite(sample.positions[6]):
+            return
+        delta = abs(sample.positions[6] - self._master_seventh_start)
+        new_state = self._hand_state
+        if self._hand_state == "open" and delta >= self._close_delta:
+            new_state = "close"
+        elif self._hand_state == "close" and delta <= self._open_delta:
+            new_state = "open"
+        if new_state == self._hand_state:
+            return
+        positions, speed, force = self._hand_actions[new_state]
+        if (not self.Set_speed([speed] * len(positions))
+                or not self.Set_force([force] * len(positions))
+                or not self.Set_joint_positions(positions)):
+            Logger.instance().error(f"灵巧手跟随动作 {new_state} 发送失败")
+            self.stop_follow_work()
+            return
+        self._hand_state = new_state
 
     def start_timer_work(self, interval_ms: int) -> bool:
         if interval_ms <= 0 or not self.is_connect:
@@ -57,6 +148,7 @@ class HandThread(QObject):
 
     def Connect(self, model: str, options: dict) -> bool:
         if self.device is not None:
+            self.stop_follow_work()
             try:
                 if not self.device.Disconnect():
                     Logger.instance().error("已有灵巧手断开失败，无法连接新设备")
@@ -87,6 +179,7 @@ class HandThread(QObject):
 
     @Slot()
     def Disconnect(self) -> bool:
+        self.stop_follow_work()
         self.stop_timer_work()
         if self.device is None:
             return False
