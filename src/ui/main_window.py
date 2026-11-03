@@ -158,82 +158,82 @@ class Ui_MainWindow(object):
         self.verticalLayout_hand_control.setObjectName(u"verticalLayout_hand_control")
         self.gridLayout_5 = QGridLayout()
         self.gridLayout_5.setObjectName(u"gridLayout_5")
-        self.pushButton_connect_hand = QPushButton(self.groupBox_hand_control)
-        self.pushButton_connect_hand.setObjectName(u"pushButton_connect_hand")
+        self.comboBox_hand_model = QComboBox(self.groupBox_hand_control)
+        self.comboBox_hand_model.addItem("")
+        self.comboBox_hand_model.setObjectName(u"comboBox_hand_model")
 
-        self.gridLayout_5.addWidget(self.pushButton_connect_hand, 1, 4, 1, 1)
-
-        self.label_hand_status = QLabel(self.groupBox_hand_control)
-        self.label_hand_status.setObjectName(u"label_hand_status")
-        self.label_hand_status.setMinimumSize(QSize(78, 0))
-
-        self.gridLayout_5.addWidget(self.label_hand_status, 1, 5, 1, 1)
-
-        self.label_34 = QLabel(self.groupBox_hand_control)
-        self.label_34.setObjectName(u"label_34")
-
-        self.gridLayout_5.addWidget(self.label_34, 1, 0, 1, 1)
-
-        self.comboBox_hand_comm_type = QComboBox(self.groupBox_hand_control)
-        self.comboBox_hand_comm_type.addItem("")
-        self.comboBox_hand_comm_type.addItem("")
-        self.comboBox_hand_comm_type.setObjectName(u"comboBox_hand_comm_type")
-
-        self.gridLayout_5.addWidget(self.comboBox_hand_comm_type, 0, 3, 1, 1)
-
-        self.label_35 = QLabel(self.groupBox_hand_control)
-        self.label_35.setObjectName(u"label_35")
-
-        self.gridLayout_5.addWidget(self.label_35, 0, 2, 1, 1)
-
-        self.comboBox_hand_comm_info = QComboBox(self.groupBox_hand_control)
-        self.comboBox_hand_comm_info.setObjectName(u"comboBox_hand_comm_info")
-
-        self.gridLayout_5.addWidget(self.comboBox_hand_comm_info, 1, 3, 1, 1)
-
-        self.label_36 = QLabel(self.groupBox_hand_control)
-        self.label_36.setObjectName(u"label_36")
-
-        self.gridLayout_5.addWidget(self.label_36, 1, 2, 1, 1)
-
-        self.comboBox_hand_type = QComboBox(self.groupBox_hand_control)
-        self.comboBox_hand_type.addItem("")
-        self.comboBox_hand_type.addItem("")
-        self.comboBox_hand_type.setObjectName(u"comboBox_hand_type")
-
-        self.gridLayout_5.addWidget(self.comboBox_hand_type, 1, 1, 1, 1)
+        self.gridLayout_5.addWidget(self.comboBox_hand_model, 0, 1, 1, 1)
 
         self.pushButton_refresh_hand_connect_info = QPushButton(self.groupBox_hand_control)
         self.pushButton_refresh_hand_connect_info.setObjectName(u"pushButton_refresh_hand_connect_info")
 
-        self.gridLayout_5.addWidget(self.pushButton_refresh_hand_connect_info, 0, 4, 1, 1)
-
-        self.horizontalLayout_hand_read_rate = QHBoxLayout()
-        self.horizontalLayout_hand_read_rate.setObjectName(u"horizontalLayout_hand_read_rate")
-        self.label_hand_read_rate = QLabel(self.groupBox_hand_control)
-        self.label_hand_read_rate.setObjectName(u"label_hand_read_rate")
-
-        self.horizontalLayout_hand_read_rate.addWidget(self.label_hand_read_rate)
-
-        self.lineEdit_hand_read_pos_rate = QLineEdit(self.groupBox_hand_control)
-        self.lineEdit_hand_read_pos_rate.setObjectName(u"lineEdit_hand_read_pos_rate")
-        self.lineEdit_hand_read_pos_rate.setMaximumSize(QSize(65, 16777215))
-
-        self.horizontalLayout_hand_read_rate.addWidget(self.lineEdit_hand_read_pos_rate)
-
-
-        self.gridLayout_5.addLayout(self.horizontalLayout_hand_read_rate, 0, 5, 1, 1)
+        self.gridLayout_5.addWidget(self.pushButton_refresh_hand_connect_info, 0, 8, 1, 1)
 
         self.label_33 = QLabel(self.groupBox_hand_control)
         self.label_33.setObjectName(u"label_33")
 
         self.gridLayout_5.addWidget(self.label_33, 0, 0, 1, 1)
 
-        self.comboBox_hand_model = QComboBox(self.groupBox_hand_control)
-        self.comboBox_hand_model.addItem("")
-        self.comboBox_hand_model.setObjectName(u"comboBox_hand_model")
+        self.label_hand_status = QLabel(self.groupBox_hand_control)
+        self.label_hand_status.setObjectName(u"label_hand_status")
+        self.label_hand_status.setMinimumSize(QSize(78, 0))
 
-        self.gridLayout_5.addWidget(self.comboBox_hand_model, 0, 1, 1, 1)
+        self.gridLayout_5.addWidget(self.label_hand_status, 0, 12, 1, 1)
+
+        self.comboBox_hand_comm_info = QComboBox(self.groupBox_hand_control)
+        self.comboBox_hand_comm_info.setObjectName(u"comboBox_hand_comm_info")
+
+        self.gridLayout_5.addWidget(self.comboBox_hand_comm_info, 0, 7, 1, 1)
+
+        self.comboBox_hand_type = QComboBox(self.groupBox_hand_control)
+        self.comboBox_hand_type.addItem("")
+        self.comboBox_hand_type.addItem("")
+        self.comboBox_hand_type.setObjectName(u"comboBox_hand_type")
+
+        self.gridLayout_5.addWidget(self.comboBox_hand_type, 0, 3, 1, 1)
+
+        self.label_35 = QLabel(self.groupBox_hand_control)
+        self.label_35.setObjectName(u"label_35")
+
+        self.gridLayout_5.addWidget(self.label_35, 0, 4, 1, 1)
+
+        self.label_34 = QLabel(self.groupBox_hand_control)
+        self.label_34.setObjectName(u"label_34")
+
+        self.gridLayout_5.addWidget(self.label_34, 0, 2, 1, 1)
+
+        self.comboBox_hand_comm_type = QComboBox(self.groupBox_hand_control)
+        self.comboBox_hand_comm_type.addItem("")
+        self.comboBox_hand_comm_type.addItem("")
+        self.comboBox_hand_comm_type.setObjectName(u"comboBox_hand_comm_type")
+
+        self.gridLayout_5.addWidget(self.comboBox_hand_comm_type, 0, 5, 1, 1)
+
+        self.horizontalLayout_hand_read_rate = QHBoxLayout()
+        self.horizontalLayout_hand_read_rate.setObjectName(u"horizontalLayout_hand_read_rate")
+        self.label_2 = QLabel(self.groupBox_hand_control)
+        self.label_2.setObjectName(u"label_2")
+
+        self.horizontalLayout_hand_read_rate.addWidget(self.label_2)
+
+
+        self.gridLayout_5.addLayout(self.horizontalLayout_hand_read_rate, 0, 9, 1, 1)
+
+        self.pushButton_connect_hand = QPushButton(self.groupBox_hand_control)
+        self.pushButton_connect_hand.setObjectName(u"pushButton_connect_hand")
+
+        self.gridLayout_5.addWidget(self.pushButton_connect_hand, 0, 11, 1, 1)
+
+        self.label_36 = QLabel(self.groupBox_hand_control)
+        self.label_36.setObjectName(u"label_36")
+
+        self.gridLayout_5.addWidget(self.label_36, 0, 6, 1, 1)
+
+        self.lineEdit_hand_read_pos_rate = QLineEdit(self.groupBox_hand_control)
+        self.lineEdit_hand_read_pos_rate.setObjectName(u"lineEdit_hand_read_pos_rate")
+        self.lineEdit_hand_read_pos_rate.setMaximumSize(QSize(65, 16777215))
+
+        self.gridLayout_5.addWidget(self.lineEdit_hand_read_pos_rate, 0, 10, 1, 1)
 
 
         self.verticalLayout_hand_control.addLayout(self.gridLayout_5)
@@ -517,23 +517,23 @@ class Ui_MainWindow(object):
         self.pushButton_robot_PowerOn.setText(QCoreApplication.translate("MainWindow", u"PowerOn", None))
         self.label_slave_status.setText(QCoreApplication.translate("MainWindow", u"\u25cf Disconnected", None))
         self.groupBox_hand_control.setTitle(QCoreApplication.translate("MainWindow", u"Dexterous Hand Control", None))
-        self.pushButton_connect_hand.setText(QCoreApplication.translate("MainWindow", u"Connect", None))
+        self.comboBox_hand_model.setItemText(0, QCoreApplication.translate("MainWindow", u"LinkerO6", None))
+
+        self.pushButton_refresh_hand_connect_info.setText(QCoreApplication.translate("MainWindow", u"Refresh", None))
+        self.label_33.setText(QCoreApplication.translate("MainWindow", u"Model", None))
         self.label_hand_status.setText(QCoreApplication.translate("MainWindow", u"\u25cf Disconnected", None))
+        self.comboBox_hand_type.setItemText(0, QCoreApplication.translate("MainWindow", u"Right Hand", None))
+        self.comboBox_hand_type.setItemText(1, QCoreApplication.translate("MainWindow", u"Left Hand", None))
+
+        self.label_35.setText(QCoreApplication.translate("MainWindow", u"Comm Type", None))
         self.label_34.setText(QCoreApplication.translate("MainWindow", u"Type", None))
         self.comboBox_hand_comm_type.setItemText(0, QCoreApplication.translate("MainWindow", u"Modbus", None))
         self.comboBox_hand_comm_type.setItemText(1, QCoreApplication.translate("MainWindow", u"Can", None))
 
-        self.label_35.setText(QCoreApplication.translate("MainWindow", u"Comm Type", None))
+        self.label_2.setText(QCoreApplication.translate("MainWindow", u"Rate (ms)", None))
+        self.pushButton_connect_hand.setText(QCoreApplication.translate("MainWindow", u"Connect", None))
         self.label_36.setText(QCoreApplication.translate("MainWindow", u"Comm Info", None))
-        self.comboBox_hand_type.setItemText(0, QCoreApplication.translate("MainWindow", u"Right Hand", None))
-        self.comboBox_hand_type.setItemText(1, QCoreApplication.translate("MainWindow", u"Left Hand", None))
-
-        self.pushButton_refresh_hand_connect_info.setText(QCoreApplication.translate("MainWindow", u"Refresh", None))
-        self.label_hand_read_rate.setText(QCoreApplication.translate("MainWindow", u"Rate (ms)", None))
         self.lineEdit_hand_read_pos_rate.setText(QCoreApplication.translate("MainWindow", u"20", None))
-        self.label_33.setText(QCoreApplication.translate("MainWindow", u"Model", None))
-        self.comboBox_hand_model.setItemText(0, QCoreApplication.translate("MainWindow", u"LinkerO6", None))
-
         self.label_37.setText(QCoreApplication.translate("MainWindow", u"\u8fd9\u91cc\u6ce8\u610f \u5982\u679c\u662fubuntu\u4e0b\u7528can  \u9700\u8981\u5728\u914d\u7f6e\u6587\u4ef6\u4e2d\u5199\u5165root\u5bc6\u7801", None))
         self.groupBox_camera_monitor.setTitle(QCoreApplication.translate("MainWindow", u"Camera Monitoring (3 Live Feeds)", None))
         self.label_camera_monitor_hint.setText(QCoreApplication.translate("MainWindow", u"Device Connections and Preview", None))
