@@ -2,6 +2,7 @@
 import json
 import logging
 import math
+from time import monotonic_ns
 from pathlib import Path
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from src.devices.drivers_factory import create_hand
@@ -15,11 +16,12 @@ class HandThread(QObject):
     sig_connection_changed = Signal(bool)
     sig_joint_positions = Signal(list)
 
-    def __init__(self, joint_snapshot: JointSnapshot | None = None):
+    def __init__(self, joint_snapshot: JointSnapshot | None = None, record_mailbox=None):
         super().__init__()
         self.device = None
         self.is_connect = False
         self.joint_snapshot = joint_snapshot
+        self.record_mailbox = record_mailbox
         self._follow_generation: int | None = None
         self._master_seventh_start: float | None = None
         self._hand_actions: dict | None = None
@@ -124,6 +126,8 @@ class HandThread(QObject):
     def read_joint_pos(self) -> None:
         positions = self.Get_joint_positions()
         if positions:
+            if self.record_mailbox is not None:
+                self.record_mailbox.publish("hand", list(positions), monotonic_ns())
             self.sig_joint_positions.emit(positions)
         elif not self.is_connect:
             self.stop_timer_work()

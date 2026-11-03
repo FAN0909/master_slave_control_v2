@@ -1,0 +1,15 @@
+{
+  "_说明": "每条 episode 创建时读取一次本配置；只控制写入数据集的前 N 个关节，不改变设备读取或跟随控制。",
+  "master": {
+    "_说明": "主手关节位置 observation.master_joints 的写入数量。",
+    "recorded_joints": 6
+  },
+  "slave": {
+    "_说明": "从手反馈 observation.state 和从手目标 action 的写入数量。",
+    "recorded_joints": 6
+  },
+  "hand": {
+    "_说明": "灵巧手反馈 observation.hand_joints 的写入数量；仅在采集时连接灵巧手才写入。",
+    "recorded_joints": 6
+  }
+}

@@ -1,6 +1,7 @@
 """D435 相机工作对象：枚举、连接、断开与读取彩色帧。"""
 
 import logging
+from time import monotonic_ns
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from src.devices.drivers_factory import create_camera
 from src.log import Logger
@@ -11,10 +12,13 @@ class CameraThread(QObject):
     sig_connection_changed = Signal(bool)
     sig_color_frame = Signal(object)
 
-    def __init__(self):
+    def __init__(self, record_mailbox=None, camera_name: str | None = None):
         super().__init__()
         self.device = None
         self.is_connect = False
+        self.record_mailbox = record_mailbox
+        self.camera_name = camera_name
+        self._recording = False
         self.read_timer = QTimer(self)
         self.read_timer.timeout.connect(self.read_color_frame)
 
@@ -32,10 +36,21 @@ class CameraThread(QObject):
     def read_color_frame(self) -> None:
         frame = self.Get_color_frame()
         if frame is not None:
+            captured_at_ns = monotonic_ns()
+            if self._recording:
+                # 驱动输出 BGR；LeRobot 图像特征使用 RGB。
+                if self.record_mailbox is not None and self.camera_name is not None:
+                    self.record_mailbox.publish(
+                        f"camera:{self.camera_name}", frame[:, :, ::-1].copy(), captured_at_ns
+                    )
             self.sig_color_frame.emit(frame)
         elif not self.is_connect:
             self.stop_timer_work()
             self.sig_connection_changed.emit(False)
+
+    @Slot(bool)
+    def set_recording(self, enabled: bool) -> None:
+        self._recording = enabled
 
     @Slot(str, dict, int)
     def connect_device(self, model: str, options: dict, interval_ms: int) -> None:
@@ -83,6 +98,7 @@ class CameraThread(QObject):
 
     @Slot()
     def Disconnect(self) -> bool:
+        self._recording = False
         if self.device is None:
             self.stop_timer_work()
             return False

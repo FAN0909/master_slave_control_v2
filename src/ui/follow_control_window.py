@@ -123,7 +123,6 @@ class Ui_FollowControlDialog(object):
 
         self.comboBox_recording_format = QComboBox(self.groupBox_follow_control)
         self.comboBox_recording_format.addItem("")
-        self.comboBox_recording_format.addItem("")
         self.comboBox_recording_format.setObjectName(u"comboBox_recording_format")
 
         self.gridLayout.addWidget(self.comboBox_recording_format, 2, 1, 1, 4)
@@ -163,7 +162,7 @@ class Ui_FollowControlDialog(object):
         self.label_follow_hint.setText(QCoreApplication.translate("FollowControlDialog", u"\u8fde\u63a5\u4e3b\u624b\u3001\u4ece\u624b\u548c\u7075\u5de7\u624b\u540e\u53ef\u542f\u52a8\u8ddf\u968f", None))
         self.pushButton_start_follow.setText(QCoreApplication.translate("FollowControlDialog", u"Start Follow", None))
         self.label_follow_interval.setText(QCoreApplication.translate("FollowControlDialog", u"Interval (ms)", None))
-        self.lineEdit_follow_rate.setText(QCoreApplication.translate("FollowControlDialog", u"20", None))
+        self.lineEdit_follow_rate.setText(QCoreApplication.translate("FollowControlDialog", u"50", None))
         self.pushButton_slave_home_pos.setText(QCoreApplication.translate("FollowControlDialog", u"Home", None))
         self.pushButton_start_recod.setText(QCoreApplication.translate("FollowControlDialog", u"StartRecod", None))
         self.pushButton_stop_recod.setText(QCoreApplication.translate("FollowControlDialog", u"StopRecod", None))
@@ -178,10 +177,9 @@ class Ui_FollowControlDialog(object):
         self.lineEdit_task.setPlaceholderText(QCoreApplication.translate("FollowControlDialog", u"\u4f8b\u5982\uff1a\u5c06\u7ea2\u8272\u65b9\u5757\u653e\u5165\u76d2\u5b50", None))
         self.label_recording_format.setText(QCoreApplication.translate("FollowControlDialog", u"Format", None))
         self.comboBox_recording_format.setItemText(0, QCoreApplication.translate("FollowControlDialog", u"lerobotV3.0", None))
-        self.comboBox_recording_format.setItemText(1, QCoreApplication.translate("FollowControlDialog", u"lerobotv2.1", None))
 
 #if QT_CONFIG(tooltip)
-        self.comboBox_recording_format.setToolTip(QCoreApplication.translate("FollowControlDialog", u"\u9009\u62e9 LeRobot \u6570\u636e\u96c6\u683c\u5f0f\uff1b\u4fdd\u5b58\u6216\u4e22\u5f03\u672c\u6761 episode \u540e\u53ef\u5207\u6362\u3002", None))
+        self.comboBox_recording_format.setToolTip(QCoreApplication.translate("FollowControlDialog", u"\u4f7f\u7528 LeRobot v3.0 \u6570\u636e\u96c6\u683c\u5f0f\u3002", None))
 #endif // QT_CONFIG(tooltip)
     # retranslateUi
 

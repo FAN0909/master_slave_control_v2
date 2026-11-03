@@ -53,7 +53,7 @@
             <item>
              <widget class="QLineEdit" name="lineEdit_follow_rate">
               <property name="text">
-               <string>20</string>
+               <string>50</string>
               </property>
              </widget>
             </item>
@@ -148,16 +148,11 @@
           <item row="2" column="1" colspan="4">
            <widget class="QComboBox" name="comboBox_recording_format">
             <property name="toolTip">
-             <string>选择 LeRobot 数据集格式；保存或丢弃本条 episode 后可切换。</string>
+             <string>使用 LeRobot v3.0 数据集格式。</string>
             </property>
             <item>
              <property name="text">
               <string>lerobotV3.0</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>lerobotv2.1</string>
              </property>
             </item>
            </widget>

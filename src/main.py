@@ -15,6 +15,7 @@ from serial.tools import list_ports
 
 if __package__:
     from .log import Logger
+    from .recording.pipeline import RecordingMailbox
     from .threads.camera_thread import CameraThread
     from .threads.hand_thread import HandThread
     from .threads.joint_snapshot import JointSnapshot
@@ -26,6 +27,7 @@ else:
     # 支持在 IDE 中直接运行 src/main.py。
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from src.log import Logger
+    from src.recording.pipeline import RecordingMailbox
     from src.threads.camera_thread import CameraThread
     from src.threads.hand_thread import HandThread
     from src.threads.joint_snapshot import JointSnapshot
@@ -49,6 +51,7 @@ class MainWindow(QMainWindow):
     request_slave_home = Signal(list,int)
     request_slave_start_follow = Signal(int)
     request_slave_stop_follow = Signal()
+    request_slave_record_feedback = Signal(bool)
     request_hand_connect = Signal(str, dict, int)
     request_hand_disconnect = Signal()
     request_hand_start_follow = Signal(int)
@@ -60,6 +63,11 @@ class MainWindow(QMainWindow):
     request_camera_disconnect_side = Signal()
     request_camera_disconnect_front = Signal()
     request_camera_disconnect_hand = Signal()
+    request_camera_record_side = Signal(bool)
+    request_camera_record_front = Signal(bool)
+    request_camera_record_hand = Signal(bool)
+    camera_connection_changed = Signal(str, bool)
+    camera_preview_frame = Signal(str, object)
 
     MAX_HOME_SPEED = 50
     def __init__(self):
@@ -78,7 +86,11 @@ class MainWindow(QMainWindow):
         self.hand_model = None
         self.hand_connected = False
         self.camera_connected = {camera: False for camera in ("side", "front", "hand")}
+
+        # 主手线程写入最新关节位置；从手和灵巧手线程读取它作为跟随目标。
         self.master_joint_snapshot = JointSnapshot()
+        # 各设备线程发布带时间戳的采集样本；采集流程从这里取样并对齐。
+        self.record_mailbox = RecordingMailbox()
 
 
         self.init_ui()
@@ -104,6 +116,12 @@ class MainWindow(QMainWindow):
         #init set ui
         self.set_dialog = SettingsDialog(self)
         self.follow_control_dialog = FollowControlDialog(self)
+        follow = self.follow_control_dialog
+        follow.configure_recording(self.record_mailbox, self)
+        follow.close_requested.connect(self.close)
+        follow.home_requested.connect(self._move_slave_home)
+        follow.follow_start_requested.connect(self._start_slave_follow)
+        follow.follow_stop_requested.connect(self._stop_slave_follow)
         #init button connect clicked
         self.init_button_connect()
 
@@ -119,11 +137,6 @@ class MainWindow(QMainWindow):
         self.ui.Btn_robot_connect.clicked.connect(self._toggle_slave_connection)
         self.ui.pushButton_robot_PowerOn.clicked.connect(self._toggle_slave_power)
         self.ui.pushButton_robot_PowerOn.setEnabled(False)
-        self.follow_control_dialog.ui.pushButton_slave_home_pos.clicked.connect(self._move_slave_home)
-        self.follow_control_dialog.ui.pushButton_slave_home_pos.setEnabled(False)
-        self.follow_control_dialog.ui.pushButton_start_follow.clicked.connect(self._toggle_slave_follow)
-        self.follow_control_dialog.ui.pushButton_start_follow.setEnabled(False)
-
         # hand 相关按钮
         self.ui.pushButton_refresh_hand_connect_info.clicked.connect(
             self._refresh_hand_comm_info
@@ -177,7 +190,7 @@ class MainWindow(QMainWindow):
     
     def init_master_thread(self):
         self.master_thread = QThread(self)
-        self.master_worker = MasterRobotThread(self.master_joint_snapshot)
+        self.master_worker = MasterRobotThread(self.master_joint_snapshot, self.record_mailbox)
         self.master_worker.moveToThread(self.master_thread)
         self.request_master_connect.connect(self.master_worker.connect_device)
         self.request_master_disconnect.connect(self.master_worker.disconnect_device)
@@ -191,7 +204,7 @@ class MainWindow(QMainWindow):
 
     def init_slave_thread(self):
         self.slave_thread = QThread(self)
-        self.slave_worker = SlaveRobotThread(self.master_joint_snapshot)
+        self.slave_worker = SlaveRobotThread(self.master_joint_snapshot, self.record_mailbox)
         self.slave_worker.moveToThread(self.slave_thread)
         self.request_slave_connect.connect(self.slave_worker.connect_device)
         self.request_slave_disconnect.connect(self.slave_worker.disconnect_device)
@@ -200,6 +213,7 @@ class MainWindow(QMainWindow):
         self.request_slave_home.connect(self.slave_worker.move_home)
         self.request_slave_start_follow.connect(self.slave_worker.start_follow_work)
         self.request_slave_stop_follow.connect(self.slave_worker.stop_follow_work)
+        self.request_slave_record_feedback.connect(self.slave_worker.set_record_feedback)
         self.slave_worker.sig_connection_changed.connect(self._on_slave_connection_changed)
         self.slave_worker.sig_power_changed.connect(self._on_slave_power_changed)
         self.slave_worker.sig_follow_changed.connect(self._on_slave_follow_changed)
@@ -215,7 +229,7 @@ class MainWindow(QMainWindow):
 
     def init_hand_thread(self):
         self.hand_thread = QThread(self)
-        self.hand_worker = HandThread(self.master_joint_snapshot)
+        self.hand_worker = HandThread(self.master_joint_snapshot, self.record_mailbox)
         self.hand_worker.moveToThread(self.hand_thread)
         self.request_hand_connect.connect(self.hand_worker.connect_device)
         self.request_hand_disconnect.connect(self.hand_worker.disconnect_device)
@@ -233,9 +247,11 @@ class MainWindow(QMainWindow):
     def init_camera_thread(self):
         self.camera_threads = {}
         self.camera_workers = {}
+        self.camera_connection_changed.connect(self._on_camera_connection_changed)
+        self.camera_preview_frame.connect(self._on_camera_frame)
         for camera in ("side", "front", "hand"):
             thread = QThread(self)
-            worker = CameraThread()
+            worker = CameraThread(self.record_mailbox, camera)
             worker.moveToThread(thread)
             thread.finished.connect(worker.Disconnect)
             thread.finished.connect(worker.deleteLater)
@@ -244,10 +260,11 @@ class MainWindow(QMainWindow):
             self.camera_workers[camera] = worker
             getattr(self, f"request_camera_connect_{camera}").connect(worker.connect_device)
             getattr(self, f"request_camera_disconnect_{camera}").connect(worker.disconnect_device)
+            getattr(self, f"request_camera_record_{camera}").connect(worker.set_recording)
             worker.sig_connection_changed.connect(
-                partial(self._on_camera_connection_changed, camera)
+                partial(self.camera_connection_changed.emit, camera)
             )
-            worker.sig_color_frame.connect(partial(self._on_camera_frame, camera))
+            worker.sig_color_frame.connect(partial(self.camera_preview_frame.emit, camera))
         # 相机设备列表是全局的，查询一次后会同步更新 side、front、hand 三个下拉框。
         self.request_camera_refresh.connect(self.camera_workers["side"].refresh_devices)
         self.camera_workers["side"].sig_devices_refreshed.connect(
@@ -381,10 +398,11 @@ class MainWindow(QMainWindow):
             self.slave_enabled = False
             self.ui.pushButton_robot_PowerOn.setText("PowerOn")
         self.ui.pushButton_robot_PowerOn.setEnabled(connected)
-        self.follow_control_dialog.ui.pushButton_slave_home_pos.setEnabled(connected and self.slave_enabled)
         if not connected:
             self._on_slave_follow_changed(False)
-        self.follow_control_dialog.ui.pushButton_start_follow.setEnabled(connected)
+        self.follow_control_dialog.set_slave_controls(
+            connected, self.slave_enabled, self.slave_following
+        )
         self._set_connection_status(
             self.ui.label_slave_status,
             "● Connected" if connected else "● Disconnected",
@@ -410,39 +428,40 @@ class MainWindow(QMainWindow):
         self.slave_enabled = enabled
         self.ui.pushButton_robot_PowerOn.setText("PowerOff" if enabled else "PowerOn")
         self.ui.pushButton_robot_PowerOn.setEnabled(self.slave_connected)
-        self.follow_control_dialog.ui.pushButton_slave_home_pos.setEnabled(self.slave_connected and enabled)
+        self.follow_control_dialog.set_slave_controls(
+            self.slave_connected, enabled, self.slave_following
+        )
 
-    @Slot()
-    def _toggle_slave_follow(self) -> None:
-        if self.slave_following:
-            self.follow_control_dialog.ui.pushButton_start_follow.setEnabled(False)
-            self.request_slave_stop_follow.emit()
-            return
+#endregion====================================slave相关=============================================
+
+#region============================================follow/record相关=====================================
+
+    @Slot(int)
+    def _start_slave_follow(self, interval_ms: int) -> None:
         if not self.slave_connected or not self.slave_enabled or not self.master_connected:
             self.logger.error("检查主从手连接状态和使能状态")
             return
-        try:
-            interval_ms = int(self.follow_control_dialog.ui.lineEdit_follow_rate.text().strip())
-            if not 0 < interval_ms <= 2_147_483_647:
-                raise ValueError
-        except ValueError:
-            self.logger.error("跟随周期必须是正整数（毫秒）")
-            return
-        self.follow_control_dialog.ui.pushButton_start_follow.setEnabled(False)
+        self.follow_control_dialog.set_follow_request_pending()
         self.follow_interval_ms = interval_ms
         self.request_slave_start_follow.emit(interval_ms)
+
+    @Slot()
+    def _stop_slave_follow(self) -> None:
+        if self.slave_following:
+            self.request_slave_stop_follow.emit()
 
     @Slot(bool)
     def _on_slave_follow_changed(self, following: bool) -> None:
         self.slave_following = following
+        if not following:
+            self.follow_control_dialog.stop_recording()
         if following and self.hand_connected:
             self.request_hand_start_follow.emit(self.follow_interval_ms)
         elif not following:
             self.request_hand_stop_follow.emit()
-        self.follow_control_dialog.ui.pushButton_start_follow.setText(
-            "Stop Follow" if following else "Start Follow"
+        self.follow_control_dialog.set_slave_controls(
+            self.slave_connected, self.slave_enabled, following
         )
-        self.follow_control_dialog.ui.pushButton_start_follow.setEnabled(self.slave_connected)
 
     @Slot()
     def _move_slave_home(self) -> None:
@@ -465,8 +484,7 @@ class MainWindow(QMainWindow):
             return
 
         self.request_slave_home.emit(home_joints,self.MAX_HOME_SPEED)
-
-#endregion====================================slave相关=============================================
+#endregion==================================follow/record相关=====================================
 
 #region====================================hand相关================================================
     @Slot()
@@ -631,6 +649,7 @@ class MainWindow(QMainWindow):
         self._set_connection_status(label, "● Disconnecting...", "disconnecting")
         getattr(self, f"request_camera_disconnect_{camera}").emit()
 
+    @Slot(str, bool)
     def _on_camera_connection_changed(self, camera: str, connected: bool) -> None:
         self.camera_connected[camera] = connected
         combo, button, label = self.camera_controls[camera]
@@ -645,6 +664,7 @@ class MainWindow(QMainWindow):
         if not connected:
             self.camera_previews[camera].clear()
 
+    @Slot(str, object)
     def _on_camera_frame(self, camera: str, frame) -> None:
         if not self.camera_connected[camera]:
             return
@@ -657,11 +677,12 @@ class MainWindow(QMainWindow):
             )
         )
 
-
-
 #endregion=====================================camera相关=================================================
 
     def closeEvent(self, event):
+        if not self.follow_control_dialog.prepare_close():
+            event.ignore()
+            return
         self.master_thread.quit()
         self.slave_thread.quit()
         self.hand_thread.quit()

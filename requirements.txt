@@ -13,3 +13,6 @@ pyserial==3.5
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.11.0+cpu
 torchvision==0.26.0+cpu
+
+# LeRobot v0.6.1 writes the v3.0 dataset format and supports this project's torch 2.11.
+lerobot[dataset] @ git+https://github.com/huggingface/lerobot.git@v0.6.1

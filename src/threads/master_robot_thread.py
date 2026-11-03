@@ -2,6 +2,7 @@
 
 import logging
 import math
+from time import monotonic_ns
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
@@ -14,11 +15,12 @@ class MasterRobotThread(QObject):
     sig_connection_changed = Signal(bool)
     sig_joint_positions = Signal(list)
 
-    def __init__(self, joint_snapshot: JointSnapshot | None = None):
+    def __init__(self, joint_snapshot: JointSnapshot | None = None, record_mailbox=None):
         super().__init__()
         self.device = None
         self.is_connect = False
         self.joint_snapshot = joint_snapshot
+        self.record_mailbox = record_mailbox
         self.logger = Logger.instance()
         self.read_timer = QTimer(self)
         self.read_timer.timeout.connect(self.read_joint_pos)
@@ -42,6 +44,8 @@ class MasterRobotThread(QObject):
     def read_joint_pos(self) -> None:
         positions = self.Get_joint_positions()
         if positions:
+            if self.record_mailbox is not None:
+                self.record_mailbox.publish("master", list(positions), monotonic_ns())
             if self.joint_snapshot is not None:
                 self.joint_snapshot.update(positions)
             self.sig_joint_positions.emit(positions)

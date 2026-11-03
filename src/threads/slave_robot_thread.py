@@ -3,6 +3,7 @@
 import json
 import logging
 import math
+from time import monotonic_ns
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
@@ -20,12 +21,14 @@ class SlaveRobotThread(QObject):
     sig_joint_positions = Signal(list)
     sig_tcp_positions = Signal(list)
     sig_follow_changed = Signal(bool)
+    sig_follow_target = Signal(list)
 
-    def __init__(self, joint_snapshot: JointSnapshot | None = None):
+    def __init__(self, joint_snapshot: JointSnapshot | None = None, record_mailbox=None):
         super().__init__()
         self._follow_direction, self._follow_gain, self._filter_time_ms = self._load_follow_config()
         self.device = None
         self.joint_snapshot = joint_snapshot
+        self.record_mailbox = record_mailbox
         self.is_connect = False
         self.is_enable = False
         self.is_following = False
@@ -36,6 +39,7 @@ class SlaveRobotThread(QObject):
         self._filtered_target: tuple[float, ...] | None = None
         self._master_generation: int | None = None
         self._follow_interval_ms = 0
+        self._record_feedback = False
 
         self.read_timer = QTimer(self)
         self.read_timer.timeout.connect(self.read_positions)
@@ -117,6 +121,9 @@ class SlaveRobotThread(QObject):
             self._master_start = sample.positions
             self._slave_start = tuple(slave_positions)
             self._last_target = tuple(slave_positions)
+            if self.record_mailbox is not None:
+                self.record_mailbox.publish("target", list(slave_positions), monotonic_ns())
+            self.sig_follow_target.emit(list(slave_positions))
             self._filtered_target = tuple(slave_positions)
             self._master_generation = sample.generation
             # 跟随期间暂停位置轮询，停止跟随后按原周期恢复。
@@ -150,6 +157,10 @@ class SlaveRobotThread(QObject):
         self._resume_read_after_follow = False
         self.sig_follow_changed.emit(False)
 
+    @Slot(bool)
+    def set_record_feedback(self, enabled: bool) -> None:
+        self._record_feedback = enabled
+
     @Slot()
     def read_positions(self) -> None:
         joint_positions = self.Get_joint_positions()
@@ -158,6 +169,8 @@ class SlaveRobotThread(QObject):
             self.sig_connection_changed.emit(False)
             return
         if joint_positions:
+            if self.record_mailbox is not None:
+                self.record_mailbox.publish("slave", list(joint_positions), monotonic_ns())
             self.sig_joint_positions.emit(joint_positions)
 
         tcp_positions = self.Get_tcp_positions()
@@ -384,6 +397,17 @@ class SlaveRobotThread(QObject):
             self.is_connect = bool(self.device.is_connected)
             self.stop_follow_work()
             return
+        if self._record_feedback:
+            positions = self.Get_joint_positions()
+            if positions:
+                if self.record_mailbox is not None:
+                    self.record_mailbox.publish("slave", list(positions), monotonic_ns())
+                self.sig_joint_positions.emit(positions)
+            if not self.is_connect:
+                self.stop_follow_work()
+                return
+            if self.record_mailbox is not None and self._last_target is not None:
+                self.record_mailbox.publish("target", list(self._last_target), monotonic_ns())
         sample = self.joint_snapshot.read() if self.joint_snapshot is not None else None
         if (sample is None or sample.generation != self._master_generation
                 or self._master_start is None or self._slave_start is None
@@ -429,3 +453,6 @@ class SlaveRobotThread(QObject):
             self.stop_follow_work()
             return
         self._last_target = target
+        if self.record_mailbox is not None:
+            self.record_mailbox.publish("target", list(target), monotonic_ns())
+        self.sig_follow_target.emit(list(target))
