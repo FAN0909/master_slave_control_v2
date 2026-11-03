@@ -119,10 +119,10 @@ class MainWindow(QMainWindow):
         self.ui.Btn_robot_connect.clicked.connect(self._toggle_slave_connection)
         self.ui.pushButton_robot_PowerOn.clicked.connect(self._toggle_slave_power)
         self.ui.pushButton_robot_PowerOn.setEnabled(False)
-        self.ui.pushButton_slave_home_pos.clicked.connect(self._move_slave_home)
-        self.ui.pushButton_slave_home_pos.setEnabled(False)
-        self.ui.pushButton_start_follow.clicked.connect(self._toggle_slave_follow)
-        self.ui.pushButton_start_follow.setEnabled(False)
+        self.follow_control_dialog.ui.pushButton_slave_home_pos.clicked.connect(self._move_slave_home)
+        self.follow_control_dialog.ui.pushButton_slave_home_pos.setEnabled(False)
+        self.follow_control_dialog.ui.pushButton_start_follow.clicked.connect(self._toggle_slave_follow)
+        self.follow_control_dialog.ui.pushButton_start_follow.setEnabled(False)
 
         # hand 相关按钮
         self.ui.pushButton_refresh_hand_connect_info.clicked.connect(
@@ -380,10 +380,10 @@ class MainWindow(QMainWindow):
             self.slave_enabled = False
             self.ui.pushButton_robot_PowerOn.setText("PowerOn")
         self.ui.pushButton_robot_PowerOn.setEnabled(connected)
-        self.ui.pushButton_slave_home_pos.setEnabled(connected and self.slave_enabled)
+        self.follow_control_dialog.ui.pushButton_slave_home_pos.setEnabled(connected and self.slave_enabled)
         if not connected:
             self._on_slave_follow_changed(False)
-        self.ui.pushButton_start_follow.setEnabled(connected)
+        self.follow_control_dialog.ui.pushButton_start_follow.setEnabled(connected)
         self._set_connection_status(
             self.ui.label_slave_status,
             "● Connected" if connected else "● Disconnected",
@@ -409,25 +409,25 @@ class MainWindow(QMainWindow):
         self.slave_enabled = enabled
         self.ui.pushButton_robot_PowerOn.setText("PowerOff" if enabled else "PowerOn")
         self.ui.pushButton_robot_PowerOn.setEnabled(self.slave_connected)
-        self.ui.pushButton_slave_home_pos.setEnabled(self.slave_connected and enabled)
+        self.follow_control_dialog.ui.pushButton_slave_home_pos.setEnabled(self.slave_connected and enabled)
 
     @Slot()
     def _toggle_slave_follow(self) -> None:
         if self.slave_following:
-            self.ui.pushButton_start_follow.setEnabled(False)
+            self.follow_control_dialog.ui.pushButton_start_follow.setEnabled(False)
             self.request_slave_stop_follow.emit()
             return
         if not self.slave_connected or not self.slave_enabled or not self.master_connected:
             self.logger.error("检查主从手连接状态和使能状态")
             return
         try:
-            interval_ms = int(self.ui.lineEdit_camera_frame_interval.text().strip())
+            interval_ms = int(self.follow_control_dialog.ui.lineEdit_follow_rate.text().strip())
             if not 0 < interval_ms <= 2_147_483_647:
                 raise ValueError
         except ValueError:
             self.logger.error("跟随周期必须是正整数（毫秒）")
             return
-        self.ui.pushButton_start_follow.setEnabled(False)
+        self.follow_control_dialog.ui.pushButton_start_follow.setEnabled(False)
         self.follow_interval_ms = interval_ms
         self.request_slave_start_follow.emit(interval_ms)
 
@@ -438,10 +438,10 @@ class MainWindow(QMainWindow):
             self.request_hand_start_follow.emit(self.follow_interval_ms)
         elif not following:
             self.request_hand_stop_follow.emit()
-        self.ui.pushButton_start_follow.setText(
+        self.follow_control_dialog.ui.pushButton_start_follow.setText(
             "Stop Follow" if following else "Start Follow"
         )
-        self.ui.pushButton_start_follow.setEnabled(self.slave_connected)
+        self.follow_control_dialog.ui.pushButton_start_follow.setEnabled(self.slave_connected)
 
     @Slot()
     def _move_slave_home(self) -> None:
