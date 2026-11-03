@@ -7,16 +7,18 @@ from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 from src.devices.drivers_factory import create_master_arm
 from src.log import Logger
+from src.threads.joint_snapshot import JointSnapshot
 
 
 class MasterRobotThread(QObject):
     sig_connection_changed = Signal(bool)
     sig_joint_positions = Signal(list)
 
-    def __init__(self):
+    def __init__(self, joint_snapshot: JointSnapshot | None = None):
         super().__init__()
         self.device = None
         self.is_connect = False
+        self.joint_snapshot = joint_snapshot
         self.logger = Logger.instance()
         self.read_timer = QTimer(self)
         self.read_timer.timeout.connect(self.read_joint_pos)
@@ -40,8 +42,12 @@ class MasterRobotThread(QObject):
     def read_joint_pos(self) -> None:
         positions = self.Get_joint_positions()
         if positions:
+            if self.joint_snapshot is not None:
+                self.joint_snapshot.update(positions)
             self.sig_joint_positions.emit(positions)
         elif not self.is_connect:
+            if self.joint_snapshot is not None:
+                self.joint_snapshot.clear()
             self.stop_timer_work()
             self.sig_connection_changed.emit(False)
 
@@ -84,6 +90,8 @@ class MasterRobotThread(QObject):
 
     def Disconnect(self) -> bool:
         self.stop_timer_work()
+        if self.joint_snapshot is not None:
+            self.joint_snapshot.clear()
         if self.device is None:
             return False
 
