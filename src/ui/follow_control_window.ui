@@ -150,6 +150,16 @@
             <property name="toolTip">
              <string>选择 LeRobot 数据集格式；保存或丢弃本条 episode 后可切换。</string>
             </property>
+            <item>
+             <property name="text">
+              <string>lerobotV3.0</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>lerobotv2.1</string>
+             </property>
+            </item>
            </widget>
           </item>
          </layout>
