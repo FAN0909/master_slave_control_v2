@@ -1,9 +1,12 @@
+import json
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, Signal, Slot
 from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
 
 from ..log import Logger
+from ..recording.lerobot_recorder import LeRobotRecorder
+from ..recording.lerobot_v21_recorder import LeRobotV21Recorder
 from ..recording.pipeline import RecordingPipeline
 from .follow_control_window import Ui_FollowControlDialog
 
@@ -34,6 +37,9 @@ class FollowControlDialog(QDialog):
         self.ui.lineEdit_save_file_path.setText(str(self.save_path))
         self.ui.pushButton_browse_save_path.clicked.connect(self._browse_save_path)
         self.ui.lineEdit_save_file_path.editingFinished.connect(self._save_typed_path)
+        self.ui.comboBox_recording_format.currentIndexChanged.connect(
+            self._refresh_saved_episode_count
+        )
         self.ui.buttonBox.rejected.connect(self.reject)
         self._following = False
         self.controller = None
@@ -51,6 +57,37 @@ class FollowControlDialog(QDialog):
         self.ui.pushButton_discard_episode.clicked.connect(self._discard_episode)
         self.set_slave_controls(False, False, False)
         self.set_recording_state("idle", 0)
+        self._refresh_saved_episode_count()
+
+    def _refresh_saved_episode_count(self) -> None:
+        """读取当前格式数据集的元数据；缺失的数据集按 0 条显示。"""
+        dataset_dirs = {
+            "v2.1": LeRobotV21Recorder.DATASET_DIR,
+            "v3.0": LeRobotRecorder.DATASET_DIR,
+        }
+        dataset_dir = dataset_dirs.get(self.ui.comboBox_recording_format.currentData())
+        if dataset_dir is None:
+            self.ui.label_saved_episodes.setText("已保存：—")
+            return
+        info_path = self.save_path / dataset_dir / "meta" / "info.json"
+        if not info_path.exists():
+            if (self.save_path / dataset_dir).exists():
+                self.ui.label_saved_episodes.setText("已保存：读取失败")
+                return
+            episodes = frames = 0
+        else:
+            try:
+                with info_path.open(encoding="utf-8") as info_file:
+                    info = json.load(info_file)
+                episodes, frames = info["total_episodes"], info["total_frames"]
+                if any(type(value) is not int or value < 0 for value in (episodes, frames)):
+                    raise ValueError("数据集计数无效")
+            except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+                self.ui.label_saved_episodes.setText("已保存：读取失败")
+                return
+        self.ui.label_saved_episodes.setText(
+            f"已保存：{episodes} 条 Episode，{frames} 帧"
+        )
 
     def configure_recording(self, mailbox, controller) -> None:
         """绑定设备协调者，并让采集流程由对话框管理。"""
@@ -211,6 +248,7 @@ class FollowControlDialog(QDialog):
         self.record_state = "idle"
         self.record_cameras = ()
         self.set_recording_state(self.record_state, self.record_count)
+        self._refresh_saved_episode_count()
         if self._closing_after_record:
             self._closing_after_record = False
             self.close_requested.emit()
@@ -254,6 +292,7 @@ class FollowControlDialog(QDialog):
             self.settings.remove(self.SAVE_PATH_KEY)
             self.save_path = self.DEFAULT_SAVE_PATH
             self.ui.lineEdit_save_file_path.setText(str(self.save_path))
+            self._refresh_saved_episode_count()
             return
         path = Path(entered).expanduser()
         if not path.is_dir():
@@ -266,3 +305,4 @@ class FollowControlDialog(QDialog):
         self.save_path = path.resolve()
         self.ui.lineEdit_save_file_path.setText(str(self.save_path))
         self.settings.setValue(self.SAVE_PATH_KEY, str(self.save_path))
+        self._refresh_saved_episode_count()

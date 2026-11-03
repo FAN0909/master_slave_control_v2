@@ -37,6 +37,9 @@ class FakeDataset:
     def finalize(self):
         self.finalized = True
 
+    def clear_episode_buffer(self):
+        self.frames.clear()
+
 
 class FakeEncoder:
     def __init__(self, **kwargs):

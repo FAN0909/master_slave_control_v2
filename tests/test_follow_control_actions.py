@@ -1,5 +1,6 @@
 """Follow Control 对话框负责按钮输入和操作信号。"""
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -102,6 +103,26 @@ class FollowControlActionsTests(unittest.TestCase):
         dialog._on_record_finished("save", "/tmp/episode", {})
         self.assertEqual(closed, [True])
         self.assertTrue(dialog.prepare_close())
+
+    def test_saved_episode_label_tracks_path_format_and_completed_save(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for folder, count, frames in (("lerobot_v30", 2, 120), ("lerobot_v21", 5, 305)):
+                meta = root / folder / "meta"
+                meta.mkdir(parents=True)
+                (meta / "info.json").write_text(
+                    json.dumps({"total_episodes": count, "total_frames": frames}), encoding="utf-8"
+                )
+            dialog = FollowControlDialog()
+            dialog._set_save_path(root)
+            self.assertEqual(dialog.ui.label_saved_episodes.text(), "已保存：2 条 Episode，120 帧")
+            dialog.ui.comboBox_recording_format.setCurrentIndex(1)
+            self.assertEqual(dialog.ui.label_saved_episodes.text(), "已保存：5 条 Episode，305 帧")
+            (root / "lerobot_v21/meta/info.json").write_text(
+                json.dumps({"total_episodes": 6, "total_frames": 350}), encoding="utf-8"
+            )
+            dialog._on_record_finished("save", str(root / "lerobot_v21"), {})
+            self.assertEqual(dialog.ui.label_saved_episodes.text(), "已保存：6 条 Episode，350 帧")
 
 
 if __name__ == "__main__":

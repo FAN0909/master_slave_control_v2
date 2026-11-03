@@ -162,6 +162,16 @@
             </item>
            </widget>
           </item>
+          <item row="4" column="0" colspan="5">
+           <widget class="QLabel" name="label_saved_episodes">
+            <property name="toolTip">
+             <string>当前保存目录和所选格式的数据集中已保存的 episode 条数及累计帧数。</string>
+            </property>
+            <property name="text">
+             <string>已保存：0 条 Episode，0 帧</string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </item>
        </layout>

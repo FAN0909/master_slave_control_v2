@@ -2,8 +2,6 @@
 
 import json
 import shutil
-import uuid
-from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +9,8 @@ import numpy as np
 
 class LeRobotRecorder:
     CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "recording.json"
+    DATASET_DIR = "lerobot_v30"
+    CODEBASE_VERSION = "v3.0"
 
     def __init__(self, root: Path, task: str, fps: int, cameras: tuple[str, ...]):
         try:
@@ -23,7 +23,8 @@ class LeRobotRecorder:
         self.fps = fps
         self.cameras = cameras
         self.recorded_joints = self._load_recording_config()
-        self.path = self.root / f"episode-{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:8]}"
+        self.path = self.root / self.DATASET_DIR
+        self._created_dataset = False
         self.dataset = None
         self.count = 0
         self.stopped = False
@@ -82,11 +83,39 @@ class LeRobotRecorder:
                 "encoder_queue_maxsize": max(4, self.fps // 2),
                 "encoder_threads": 2,
             }
-        self.dataset = self.dataset_type.create(
-            repo_id=f"local/{self.path.name}", root=self.path,
-            fps=self.fps, features=features, robot_type="NRC",
-            use_videos=bool(self.cameras), **options,
-        )
+        repo_id = f"local/{self.path.name}"
+        info_path = self.path / "meta" / "info.json"
+        if self.path.exists():
+            if not info_path.is_file():
+                raise ValueError(f"数据集目录已存在但缺少 meta/info.json：{self.path}")
+            with info_path.open(encoding="utf-8") as info_file:
+                info = json.load(info_file)
+            self._check_existing_schema(info, features)
+            self.dataset = self.dataset_type.resume(
+                repo_id=repo_id, root=self.path, **options,
+            )
+        else:
+            self.dataset = self.dataset_type.create(
+                repo_id=repo_id, root=self.path,
+                fps=self.fps, features=features, robot_type="NRC",
+                use_videos=bool(self.cameras), **options,
+            )
+            self._created_dataset = True
+
+    def _check_existing_schema(self, info: dict, features: dict) -> None:
+        if info.get("codebase_version") != self.CODEBASE_VERSION or info.get("fps") != self.fps:
+            raise ValueError(f"已有数据集的格式或帧率与当前采集不一致：{self.path}")
+        existing = info.get("features", {})
+        if set(existing) != set(features) | {
+            "timestamp", "frame_index", "episode_index", "index", "task_index"
+        }:
+            raise ValueError(f"已有数据集字段与当前设备配置不一致：{self.path}")
+        for key, feature in features.items():
+            saved = existing[key]
+            if (saved.get("dtype") != feature["dtype"]
+                    or tuple(saved.get("shape", ())) != tuple(feature["shape"])
+                    or saved.get("names") != feature["names"]):
+                raise ValueError(f"已有数据集的 {key} 与当前设备配置不一致：{self.path}")
 
     def _validate_sample(self, state, action, master, hand,
                          images: dict[str, np.ndarray]) -> None:
@@ -156,6 +185,7 @@ class LeRobotRecorder:
 
     def discard(self) -> None:
         if self.dataset is not None:
+            self.dataset.clear_episode_buffer()
             self.dataset.finalize()
-        if self.path.exists():
+        if self._created_dataset and self.path.exists():
             shutil.rmtree(self.path)

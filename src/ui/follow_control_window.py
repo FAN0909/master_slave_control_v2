@@ -128,6 +128,11 @@ class Ui_FollowControlDialog(object):
 
         self.gridLayout.addWidget(self.comboBox_recording_format, 2, 1, 1, 4)
 
+        self.label_saved_episodes = QLabel(self.groupBox_follow_control)
+        self.label_saved_episodes.setObjectName(u"label_saved_episodes")
+
+        self.gridLayout.addWidget(self.label_saved_episodes, 4, 0, 1, 5)
+
 
         self.verticalLayout_2.addLayout(self.gridLayout)
 
@@ -183,5 +188,9 @@ class Ui_FollowControlDialog(object):
 #if QT_CONFIG(tooltip)
         self.comboBox_recording_format.setToolTip(QCoreApplication.translate("FollowControlDialog", u"\u9009\u62e9\u5f53\u524d episode \u7684 LeRobot \u6570\u636e\u96c6\u683c\u5f0f\u3002", None))
 #endif // QT_CONFIG(tooltip)
+#if QT_CONFIG(tooltip)
+        self.label_saved_episodes.setToolTip(QCoreApplication.translate("FollowControlDialog", u"\u5f53\u524d\u4fdd\u5b58\u76ee\u5f55\u548c\u6240\u9009\u683c\u5f0f\u7684\u6570\u636e\u96c6\u4e2d\u5df2\u4fdd\u5b58\u7684 episode \u6761\u6570\u53ca\u7d2f\u8ba1\u5e27\u6570\u3002", None))
+#endif // QT_CONFIG(tooltip)
+        self.label_saved_episodes.setText(QCoreApplication.translate("FollowControlDialog", u"\u5df2\u4fdd\u5b58\uff1a0 \u6761 Episode\uff0c0 \u5e27", None))
     # retranslateUi
 
