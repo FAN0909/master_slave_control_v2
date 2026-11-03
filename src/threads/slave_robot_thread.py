@@ -23,7 +23,7 @@ class SlaveRobotThread(QObject):
 
     def __init__(self, joint_snapshot: JointSnapshot | None = None):
         super().__init__()
-        self._follow_direction, self._follow_gain = self._load_follow_config()
+        self._follow_direction, self._follow_gain, self._filter_time_ms = self._load_follow_config()
         self.device = None
         self.joint_snapshot = joint_snapshot
         self.is_connect = False
@@ -33,6 +33,7 @@ class SlaveRobotThread(QObject):
         self._master_start: tuple[float, ...] | None = None
         self._slave_start: tuple[float, ...] | None = None
         self._last_target: tuple[float, ...] | None = None
+        self._filtered_target: tuple[float, ...] | None = None
         self._master_generation: int | None = None
         self._follow_interval_ms = 0
 
@@ -42,7 +43,7 @@ class SlaveRobotThread(QObject):
         self.follow_timer = QTimer(self)
         self.follow_timer.timeout.connect(self.follow_move)
 
-    def _load_follow_config(self) -> tuple[tuple[int, ...], tuple[float, ...]]:
+    def _load_follow_config(self) -> tuple[tuple[int, ...], tuple[float, ...], float]:
         """创建线程时读取一次跟随参数。"""
         path = self.FOLLOW_CONFIG_PATH
         try:
@@ -50,6 +51,7 @@ class SlaveRobotThread(QObject):
                 config = json.load(file)
             direction = config["FOLLOW_JOINT_DIRECTION"]
             gain = config["FOLLOW_JOINT_GAIN"]
+            filter_time_ms = config["FOLLOW_FILTER_TIME_MS"]
             if (not isinstance(direction, list) or not direction
                     or any(type(value) is not int or value not in (-1, 1)
                            for value in direction)):
@@ -58,7 +60,10 @@ class SlaveRobotThread(QObject):
                     or any(type(value) not in (int, float)
                            or not math.isfinite(value) or value <= 0 for value in gain)):
                 raise ValueError("FOLLOW_JOINT_GAIN 必须包含与方向参数等长的正数")
-            return tuple(direction), tuple(float(value) for value in gain)
+            if (type(filter_time_ms) not in (int, float)
+                    or not math.isfinite(filter_time_ms) or filter_time_ms < 0):
+                raise ValueError("FOLLOW_FILTER_TIME_MS 必须是非负的有限数值")
+            return tuple(direction), tuple(float(value) for value in gain), float(filter_time_ms)
         except (OSError, ValueError, KeyError, TypeError) as error:
             message = f"跟随参数读取失败 ({path}): {error}"
             Logger.instance().error(message)
@@ -112,6 +117,7 @@ class SlaveRobotThread(QObject):
             self._master_start = sample.positions
             self._slave_start = tuple(slave_positions)
             self._last_target = tuple(slave_positions)
+            self._filtered_target = tuple(slave_positions)
             self._master_generation = sample.generation
             # 跟随期间暂停位置轮询，停止跟随后按原周期恢复。
             self._resume_read_after_follow = self.read_timer.isActive()
@@ -135,6 +141,7 @@ class SlaveRobotThread(QObject):
         self._master_start = None
         self._slave_start = None
         self._last_target = None
+        self._filtered_target = None
         self._master_generation = None
         self._follow_interval_ms = 0
         Logger.instance().info(f" stop follow")
@@ -380,7 +387,7 @@ class SlaveRobotThread(QObject):
         sample = self.joint_snapshot.read() if self.joint_snapshot is not None else None
         if (sample is None or sample.generation != self._master_generation
                 or self._master_start is None or self._slave_start is None
-                or self._last_target is None):
+                or self._last_target is None or self._filtered_target is None):
             return
         if (len(sample.positions) != len(self._master_start)
                 or not all(math.isfinite(value) for value in sample.positions)):
@@ -399,11 +406,21 @@ class SlaveRobotThread(QObject):
             Logger.instance().error("从手跟随目标包含无效关节角，已停止跟随")
             self.stop_follow_work()
             return
+        # 先平滑目标，再按原有速度上限约束每次发送的位置。 这里用的是一阶低通滤波器，时间常数为 self._filter_time_ms，采样周期为 self._follow_interval_ms。
+        if self._filter_time_ms == 0:
+            filtered = desired
+        else:
+            alpha = -math.expm1(-self._follow_interval_ms / self._filter_time_ms)
+            filtered = tuple(
+                previous + alpha * (goal - previous)
+                for previous, goal in zip(self._filtered_target, desired)
+            )
+        self._filtered_target = filtered
         # 单次目标变化不超过驱动配置的速度上限对应的周期位移。
         max_step = self.device.SERVO_J_VMAX * self._follow_interval_ms / 1000
         target = tuple(
             previous + max(-max_step, min(max_step, goal - previous))
-            for previous, goal in zip(self._last_target, desired)
+            for previous, goal in zip(self._last_target, filtered)
         )
         if target == self._last_target:
             return
