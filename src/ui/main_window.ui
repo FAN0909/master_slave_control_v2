@@ -426,6 +426,13 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QPushButton" name="pushButton_disconnect_all_camera">
+           <property name="text">
+            <string>Disconnect all</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </item>
        <item>

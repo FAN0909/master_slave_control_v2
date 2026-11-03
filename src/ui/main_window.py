@@ -295,6 +295,11 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_camera_toolbar.addWidget(self.pushButton_camera_refresh)
 
+        self.pushButton_disconnect_all_camera = QPushButton(self.groupBox_camera_monitor)
+        self.pushButton_disconnect_all_camera.setObjectName(u"pushButton_disconnect_all_camera")
+
+        self.horizontalLayout_camera_toolbar.addWidget(self.pushButton_disconnect_all_camera)
+
 
         self.verticalLayout_camera_monitor.addLayout(self.horizontalLayout_camera_toolbar)
 
@@ -543,6 +548,7 @@ class Ui_MainWindow(object):
         self.label_camera_frame_interval.setText(QCoreApplication.translate("MainWindow", u"Interval (ms)", None))
         self.lineEdit_camera_frame_interval.setText(QCoreApplication.translate("MainWindow", u"20", None))
         self.pushButton_camera_refresh.setText(QCoreApplication.translate("MainWindow", u"Refresh Devices List", None))
+        self.pushButton_disconnect_all_camera.setText(QCoreApplication.translate("MainWindow", u"Disconnect all", None))
         self.groupBox_camera_1.setTitle(QCoreApplication.translate("MainWindow", u"Camera 1 (Side View)", None))
         self.label_camera_device_1.setText(QCoreApplication.translate("MainWindow", u"Device", None))
         self.pushButton_connect_side_camera.setText(QCoreApplication.translate("MainWindow", u"Connect", None))
