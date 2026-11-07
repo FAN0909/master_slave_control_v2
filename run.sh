@@ -10,7 +10,7 @@ PYSIDE6_UIC="$PROJECT_ROOT/.venv/bin/pyside6-uic"
 UI_DIR="$PROJECT_ROOT/src/ui"
 
 if [[ ! -x "$PYTHON" ]]; then
-    echo "启动失败：请确认 .venv 已创建，并已安装 PySide6。" >&2
+    echo "启动失败：请先运行 ./setup.sh 创建虚拟环境并安装依赖。" >&2
     exit 1
 fi
 
