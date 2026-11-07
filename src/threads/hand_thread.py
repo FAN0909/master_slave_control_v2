@@ -26,6 +26,7 @@ class HandThread(QObject):
         self._master_seventh_start: float | None = None
         self._hand_actions: dict | None = None
         self._hand_state = "open"
+        self._hand_target: list[float] | None = None
         self.read_timer = QTimer(self)
         self.read_timer.timeout.connect(self.read_joint_pos)
         self.follow_timer = QTimer(self)
@@ -68,6 +69,10 @@ class HandThread(QObject):
         self._master_seventh_start = sample.positions[6]
         self._follow_generation = sample.generation
         self._hand_state = "open"
+        # 初始跟随状态不主动发送开手指令；用当前实测位置作为初始目标，
+        # 后续在 open/close 切换时记录真正发送给灵巧手的目标位置。
+        current_positions = self.Get_joint_positions()
+        self._hand_target = list(current_positions) if current_positions else None
         self.follow_timer.start(interval_ms)
         return True
 
@@ -78,6 +83,7 @@ class HandThread(QObject):
         self._master_seventh_start = None
         self._hand_actions = None
         self._hand_state = "open"
+        self._hand_target = None
 
     @Slot()
     def follow_move(self) -> None:
@@ -108,6 +114,9 @@ class HandThread(QObject):
             self.stop_follow_work()
             return
         self._hand_state = new_state
+        self._hand_target = list(positions)
+        if self.record_mailbox is not None:
+            self.record_mailbox.publish("hand_action", list(positions), monotonic_ns())
 
     def start_timer_work(self, interval_ms: int) -> bool:
         if interval_ms <= 0 or not self.is_connect:
@@ -127,7 +136,10 @@ class HandThread(QObject):
         positions = self.Get_joint_positions()
         if positions:
             if self.record_mailbox is not None:
-                self.record_mailbox.publish("hand", list(positions), monotonic_ns())
+                timestamp_ns = monotonic_ns()
+                self.record_mailbox.publish("hand", list(positions), timestamp_ns)
+                if self._hand_target is not None:
+                    self.record_mailbox.publish("hand_action", list(self._hand_target), timestamp_ns)
             self.sig_joint_positions.emit(positions)
         elif not self.is_connect:
             self.stop_timer_work()

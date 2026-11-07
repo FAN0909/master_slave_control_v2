@@ -35,7 +35,7 @@ class LeRobotRecorder:
                 config = json.load(config_file)
             counts = {
                 device: config[device]["recorded_joints"]
-                for device in ("master", "slave", "hand")
+                for device in ("slave", "hand")
             }
             if any(type(count) is not int or count <= 0 for count in counts.values()):
                 raise ValueError("recorded_joints 必须是正整数")
@@ -44,28 +44,23 @@ class LeRobotRecorder:
             raise ValueError(f"采集关节配置无效 ({self.CONFIG_PATH}): {error}") from error
 
     def prepare(self, state, action, master, hand, images: dict[str, np.ndarray],
-                capture_elapsed_s: float | None = None) -> None:
+                capture_elapsed_s: float | None = None, hand_action=None) -> None:
         """根据设备样本确定字段并初始化数据集，但不写入预检样本。"""
         if self.dataset is not None:
             return
-        self._validate_sample(state, action, master, hand, images)
-        master_count = self.recorded_joints["master"]
+        self._validate_sample(state, action, master, hand, images, hand_action)
         slave_count = self.recorded_joints["slave"]
+        hand_count = self.recorded_joints["hand"] if hand is not None else 0
+        hand_state_count = hand_count if hand is not None and hand_action is not None else 0
+        action_hand_count = hand_state_count
+        state_names = ([f"arm_joint_{i}" for i in range(slave_count)]
+                       + [f"hand_joint_{i}" for i in range(hand_state_count)])
+        action_names = ([f"arm_joint_{i}" for i in range(slave_count)]
+                        + [f"hand_joint_{i}.command" for i in range(action_hand_count)])
         features = {
-            "observation.state": {"dtype": "float32", "shape": (slave_count,), "names": [f"joint_{i}" for i in range(slave_count)]},
-            "action": {"dtype": "float32", "shape": (slave_count,), "names": [f"joint_{i}" for i in range(slave_count)]},
-            "observation.master_joints": {"dtype": "float32", "shape": (master_count,), "names": [f"joint_{i}" for i in range(master_count)]},
+            "observation.state": {"dtype": "float32", "shape": (slave_count + hand_state_count,), "names": state_names},
+            "action": {"dtype": "float32", "shape": (slave_count + action_hand_count,), "names": action_names},
         }
-        if capture_elapsed_s is not None:
-            features["capture_elapsed_s"] = {
-                "dtype": "float64", "shape": (1,), "names": ["seconds"],
-            }
-        if hand is not None:
-            hand_count = self.recorded_joints["hand"]
-            features["observation.hand_joints"] = {
-                "dtype": "float32", "shape": (hand_count,),
-                "names": [f"joint_{i}" for i in range(hand_count)],
-            }
         for camera, image in images.items():
             features[f"observation.images.{camera}"] = {
                 "dtype": "video", "shape": image.shape,
@@ -118,16 +113,16 @@ class LeRobotRecorder:
                 raise ValueError(f"已有数据集的 {key} 与当前设备配置不一致：{self.path}")
 
     def _validate_sample(self, state, action, master, hand,
-                         images: dict[str, np.ndarray]) -> None:
+                         images: dict[str, np.ndarray], hand_action=None) -> None:
         state = np.asarray(state, dtype=np.float32)
         action = np.asarray(action, dtype=np.float32)
         master = np.asarray(master, dtype=np.float32)
         if (state.ndim != 1 or action.ndim != 1 or master.ndim != 1
-                or not len(state) or len(action) != len(state) or not len(master)):
-            raise ValueError("主手、从手反馈和从手目标必须是一维关节数组，且从手反馈与目标长度相同")
+                or not len(state) or not len(action) or not len(master)):
+            raise ValueError("状态、动作和主手数据必须是一维数组；动作需包含从手目标及已连接灵巧手的目标")
         if not all(np.isfinite(values).all() for values in (state, action, master)):
             raise ValueError("关节数据包含无效数值")
-        for device, values in (("slave", state), ("slave", action), ("master", master)):
+        for device, values in (("slave", state), ("slave", action)):
             if self.recorded_joints[device] > len(values):
                 raise ValueError(f"{device} 配置采集 {self.recorded_joints[device]} 轴，设备仅提供 {len(values)} 轴")
         if hand is not None:
@@ -138,6 +133,12 @@ class LeRobotRecorder:
                 )
             if not np.isfinite(hand_values).all():
                 raise ValueError("灵巧手关节数据包含无效数值")
+            if hand_action is not None:
+                hand_action_values = np.asarray(hand_action, dtype=np.float32)
+                if hand_action_values.ndim != 1 or self.recorded_joints["hand"] > hand_action_values.size:
+                    raise ValueError("灵巧手控制目标维度与采集配置不匹配")
+                if not np.isfinite(hand_action_values).all():
+                    raise ValueError("灵巧手动作数据包含无效数值")
         if set(images) != set(self.cameras):
             raise ValueError("相机帧尚未齐全")
         for image in images.values():
@@ -145,28 +146,26 @@ class LeRobotRecorder:
                 raise ValueError("相机图像必须为 HWC uint8 RGB")
 
     def add_frame(self, state, action, master, hand, images: dict[str, np.ndarray],
-                  capture_elapsed_s: float | None = None) -> None:
+                  capture_elapsed_s: float | None = None, hand_action=None) -> None:
         if self.stopped:
             raise RuntimeError("episode 已停止")
-        self._validate_sample(state, action, master, hand, images)
-        self.prepare(state, action, master, hand, images, capture_elapsed_s)
+        self._validate_sample(state, action, master, hand, images, hand_action)
+        self.prepare(state, action, master, hand, images, capture_elapsed_s, hand_action)
         # 只在数据集写入边界截取；设备线程仍保留完整数据供控制使用。
-        master_count = self.recorded_joints["master"]
         slave_count = self.recorded_joints["slave"]
         frame = {
-            "observation.state": np.asarray(state[:slave_count], dtype=np.float32),
-            "action": np.asarray(action[:slave_count], dtype=np.float32),
-            "observation.master_joints": np.asarray(master[:master_count], dtype=np.float32),
+            "observation.state": np.concatenate((
+                np.asarray(state[:slave_count], dtype=np.float32),
+                np.asarray(hand[:self.recorded_joints["hand"]], dtype=np.float32)
+                if hand is not None and hand_action is not None else np.asarray([], dtype=np.float32),
+            )),
+            "action": np.concatenate((
+                np.asarray(action[:slave_count], dtype=np.float32),
+                np.asarray(hand_action[:self.recorded_joints["hand"]], dtype=np.float32)
+                if hand is not None and hand_action is not None else np.asarray([], dtype=np.float32),
+            )),
             "task": self.task,
         }
-        if "capture_elapsed_s" in self.dataset.features:
-            frame["capture_elapsed_s"] = np.asarray([capture_elapsed_s], dtype=np.float64)
-        if "observation.hand_joints" in self.dataset.features:
-            if hand is None:
-                raise ValueError("灵巧手数据缺失")
-            frame["observation.hand_joints"] = np.asarray(
-                hand[:self.recorded_joints["hand"]], dtype=np.float32
-            )
         for camera, image in images.items():
             frame[f"observation.images.{camera}"] = image
         self.dataset.add_frame(frame)

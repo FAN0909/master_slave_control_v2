@@ -87,7 +87,7 @@ class RecordingPipeline(QObject):
         self.root, self.task, self.fps = root, task, fps
         self.recording_format = recording_format
         self.cameras, self.hand = cameras, hand
-        self._keys = ("master", "slave", "target") + (("hand",) if hand else ()) + tuple(
+        self._keys = ("master", "slave", "target") + (("hand", "hand_action") if hand else ()) + tuple(
             f"camera:{camera}" for camera in cameras
         )
         self._sample_queue = Queue(maxsize=self.QUEUE_SIZE)
@@ -130,6 +130,7 @@ class RecordingPipeline(QObject):
             latest["hand"][0] if self.hand else None,
             {camera: latest[f"camera:{camera}"][0] for camera in self.cameras},
             (now_ns - started_ns) / 1_000_000_000,
+            latest["hand_action"][0] if self.hand else None,
         ), None
 
     def _wait_for_first_frame(self) -> tuple | None:
